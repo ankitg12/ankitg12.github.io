@@ -9,7 +9,7 @@ categories: windows productivity
 
 This is [a known gap](https://github.com/hovancik/stretchly/issues/1638). None of the 22 active forks implement it either.
 
-Here is how to add it on Windows without touching Stretchly's source.
+Here is how to add it on Windows without touching Stretchly's source using the scripts here - [gist](https://gist.github.com/ankitg12/d9d931e6e2f41506e456625a9ee0faa8).
 
 ---
 
@@ -83,5 +83,3 @@ Enable *Launch at login* in Stretchly Preferences so it is always running when y
 Stretchly's internal timer runs independently. Without disabling it, you get two break sources. Go to Preferences → Mini Breaks and turn mini-breaks off. Leave long breaks on Stretchly's internal schedule if you want them on a different cadence.
 
 ---
-
-Scripts are in this [gist](https://gist.github.com/ankitg12/d9d931e6e2f41506e456625a9ee0faa8).
