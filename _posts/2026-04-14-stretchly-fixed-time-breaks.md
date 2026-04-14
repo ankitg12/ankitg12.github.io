@@ -7,7 +7,7 @@ categories: windows productivity
 
 [Stretchly](https://hovancik.net/stretchly/) counts down from the moment it starts. If you launch it at 9:03, your breaks land at 9:13, 9:23, 9:33. Share a calendar with anyone and those times mean nothing. A break at 9:00, 9:10, 9:20 — on the clock — is a different thing.
 
-This is [a known gap](https://github.com/hovancik/stretchly/issues/1638). The maintainer declined to implement it. None of the 22 active forks implement it either.
+This is [a known gap](https://github.com/hovancik/stretchly/issues/1638). None of the 22 active forks implement it either.
 
 Here is how to add it on Windows without touching Stretchly's source.
 
