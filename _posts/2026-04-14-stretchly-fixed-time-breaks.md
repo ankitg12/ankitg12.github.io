@@ -9,7 +9,7 @@ categories: windows productivity
 
 This is [a known gap](https://github.com/hovancik/stretchly/issues/1638). None of the 22 active forks implement it either.
 
-Here is how to add it on Windows without touching Stretchly's source using the scripts here - [gist](https://gist.github.com/ankitg12/d9d931e6e2f41506e456625a9ee0faa8).
+Here is how to add it on Windows without touching Stretchly's source.
 
 ---
 
@@ -17,53 +17,36 @@ Here is how to add it on Windows without touching Stretchly's source using the s
 
 Windows Task Scheduler fires a task at every clock-aligned N-minute boundary. The task calls `stretchly mini` — Stretchly's own CLI — which triggers a break in the already-running app.
 
-Two files:
-
 **`stretchly-fixed-break.ps1`** — the task payload. Checks if Stretchly is running; calls `stretchly mini` if so, exits silently if not. Closing Stretchly is your pause mechanism.
-
-**`setup-stretchly-fixed-breaks.ps1`** — registers the scheduled task. Run once; survives reboots.
-
----
-
-## The trigger pattern
-
-`New-ScheduledTaskTrigger` supports `-RepetitionInterval` only on its `-Once` parameter set, not `-Daily`. But a `Once` trigger with a fixed start date drifts — after its duration window expires, it stops firing.
-
-The fix: create a `-Daily` trigger as the base (resets at midnight, fires every day), borrow the `Repetition` CimInstance from a `-Once` trigger, and assign it across before registering. Omitting `-RepetitionDuration` leaves the duration empty, which Task Scheduler treats as indefinite.
-
-```powershell
-$daily = New-ScheduledTaskTrigger -Daily -At 00:00
-$rep   = New-ScheduledTaskTrigger -Once  -At 00:00 `
-             -RepetitionInterval (New-TimeSpan -Minutes 10)
-$daily.Repetition = $rep.Repetition
-```
-
-Task Scheduler shows this correctly in the UI: *"At 12:00 AM every day — after triggered, repeat every 10 minutes."*
-
-`StartWhenAvailable:$false` ensures missed firings (machine asleep) are skipped rather than caught up, preserving clock alignment.
 
 ---
 
 ## Setup
 
 ```powershell
-pwsh -File .\setup-stretchly-fixed-breaks.ps1
-# or choose a different interval:
-pwsh -File .\setup-stretchly-fixed-breaks.ps1 -IntervalMinutes 5
-# valid values: 5, 10, 15, 20, 30
+schtasks /Create /SC MINUTE /MO 10 /TN "StretchlyFixedBreaks" `
+  /TR "\"C:\Program Files\PowerShell\7\pwsh.exe\" -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File \"%USERPROFILE%\tools\stretchly-fixed-break.ps1\"" `
+  /ST 00:00 /F
 ```
 
-Verify it took:
+`/SC MINUTE /MO 10 /ST 00:00` fires every 10 minutes starting from midnight — clock-aligned by construction. Survives reboots without any trigger window expiry.
+
+Change the interval (replace `10` with `5`, `15`, `20`, or `30`):
 
 ```powershell
-(Get-ScheduledTask -TaskName StretchlyFixedBreaks).Triggers[0].Repetition
-Get-ScheduledTask -TaskName StretchlyFixedBreaks | Get-ScheduledTaskInfo | Select-Object NextRunTime
+schtasks /Create /SC MINUTE /MO 5 /TN "StretchlyFixedBreaks" /TR "..." /ST 00:00 /F
 ```
 
-To remove:
+Verify:
 
 ```powershell
-pwsh -File .\setup-stretchly-fixed-breaks.ps1 -Remove
+schtasks /Query /TN "StretchlyFixedBreaks" /FO LIST
+```
+
+Remove:
+
+```powershell
+schtasks /Delete /TN "StretchlyFixedBreaks" /F
 ```
 
 ---
@@ -83,3 +66,5 @@ Enable *Launch at login* in Stretchly Preferences so it is always running when y
 Stretchly's internal timer runs independently. Without disabling it, you get two break sources. Go to Preferences → Mini Breaks and turn mini-breaks off. Leave long breaks on Stretchly's internal schedule if you want them on a different cadence.
 
 ---
+
+Script is in this [gist](https://gist.github.com/ankitg12/d9d931e6e2f41506e456625a9ee0faa8).
