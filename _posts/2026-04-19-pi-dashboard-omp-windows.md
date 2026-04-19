@@ -56,18 +56,32 @@ Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'tsx'
 
 The npm-generated `.cmd` wrapper passes `--import tsx` to node. Node resolves bare specifiers in `--import` from the current working directory, not from the package. `tsx` lives in the dashboard's own `node_modules`, so it is only found when you are in that directory.
 
-The fix is to patch `%APPDATA%\npm\pi-dashboard.cmd` to use the absolute path to tsx as a `file://` URL:
+npm generates three wrappers: a bash script (for Git Bash), a `.cmd` (for `cmd.exe`), and a `.ps1` (for PowerShell 7). All three pass `--import tsx` and all three need patching.
+
+Node resolves bare specifiers in `--import` from the current working directory. The `%VAR:\=/%` substitution in `.cmd` also fails silently across `endlocal`. The reliable fix is to hardcode the absolute path as a `file://` URL directly — no SET variables.
+
+**`%APPDATA%\npm\pi-dashboard.cmd`** — replace the final `endLocal` line:
 
 ```batch
-SET "TSX=%dp0%node_modules\@blackbelt-technology\pi-agent-dashboard\node_modules\tsx\dist\esm\index.mjs"
-SET "CLI=%dp0%node_modules\@blackbelt-technology\pi-agent-dashboard\packages\server\src\cli.ts"
-"%_prog%" --import "file:///%TSX:\=/%" "%CLI%" %*
+endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%" --import "file:///C:/Users/angaur/AppData/Roaming/npm/node_modules/@blackbelt-technology/pi-agent-dashboard/node_modules/tsx/dist/esm/index.mjs" "C:\Users\angaur\AppData\Roaming\npm\node_modules\@blackbelt-technology\pi-agent-dashboard\packages\server\src\cli.ts" %*
 ```
 
-The `file:///` prefix and the backslash-to-forward-slash conversion (`%TSX:\=/%`) are both required — Node's ESM loader rejects Windows paths without them.
+**`%APPDATA%\npm\pi-dashboard.ps1`** — replace the `--import tsx` references:
 
-After this, `pi-dashboard status`, `pi-dashboard start`, and `pi-dashboard stop` work from any directory.
+```powershell
+$tsx = "file:///$($basedir -replace '\\','/')/node_modules/@blackbelt-technology/pi-agent-dashboard/node_modules/tsx/dist/esm/index.mjs"
+$cli = "$basedir/node_modules/@blackbelt-technology/pi-agent-dashboard/packages/server/src/cli.ts"
+# then use $tsx and $cli in place of the hardcoded --import tsx and path arguments
+```
 
+The `file:///` prefix is required in both — Node's ESM loader rejects bare Windows drive paths (`c:\...`) in `--import`.
+
+After patching both, `pi-dashboard status` works from any shell:
+
+```
+PS C:\Users\angaur> pi-dashboard status
+Dashboard server is running (pid 14852) on BLRANGAUR:8000, uptime 2676s (discovered via mDNS)
+```
 ---
 
 ## Starting the server
@@ -135,6 +149,6 @@ New-NetFirewallRule -DisplayName "pi-dashboard (localhost)" `
 |---|---|
 | `npm:` package not found | Install via `https://` GitHub URL |
 | omp ignores pi's settings | Add extension path to `~/.omp/agent/config.yml` |
-| `pi-dashboard` fails outside its dir | Patch `.cmd` to use `file://` URL for tsx loader |
+| `pi-dashboard` fails outside its dir | Patch `.cmd` **and** `.ps1` with hardcoded `file://` URL for tsx loader |
 | Daemon mode silently fails on Windows | Use `Start-Process` with `-WindowStyle Hidden` |
 | Bridge fails: missing `@mariozechner/pi-ai` | Junction `@mariozechner/*` → `@oh-my-pi/*` in dashboard's `node_modules` |
