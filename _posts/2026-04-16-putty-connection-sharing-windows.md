@@ -32,6 +32,8 @@ Reading [ssh/sharing.c](https://git.tartarus.org/?p=simon/putty.git;a=blob;f=ssh
 
 The PuTTY wishlist has a related open item from 2013: [dedicated-sharing-upstream](https://www.chiark.greenend.org.uk/~sgtatham/putty/wishlist/dedicated-sharing-upstream.html) — a proposed `pshare` utility that would act as a persistent headless upstream and handle this correctly.
 
+This behaviour — `-N` upstream causing downstream hangs — does not appear to be documented anywhere. No bug report, no Stack Overflow answer, no existing blog post covers it. The source code is the only way to find it.
+
 ---
 
 ## What works
