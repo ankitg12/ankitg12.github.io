@@ -7,7 +7,7 @@ categories: ai agents productivity
 
 AI coding agents run for hours without pausing to reflect. Humans take breaks. This post describes wiring the two together: when [Stretchly](https://hovancik.net/stretchly/) fires a break, the agent stops, reviews what it did, and answers five standup questions before continuing.
 
-Built as two [OMP](https://github.com/can1357/oh-my-pi) extensions. No external dependencies.
+Built as an [OMP](https://github.com/can1357/oh-my-pi) extension. No external dependencies. See also: [Adding timestamps to AI coding agent conversations]({% post_url 2026-04-27-timestamps-for-ai-coding-agents %}).
 
 ---
 
@@ -73,21 +73,6 @@ Breaks are detected at multiple points to avoid missing them:
 
 A synchronous `checking` flag prevents the same break from triggering multiple retros.
 
-## Timestamps extension
-
-A second extension (`chat-timestamps`) adds timestamps to the chat:
-
-- **User messages**: `[HH:MM:SS]` prepended via `input` event transform (deterministic)
-- **Agent responses**: system prompt instruction via `before_agent_start` (best effort)
-- **Status bar**: live `[HH:MM:SS] toolName` during execution, `[HH:MM:SS] Xs` after turn
-
-```typescript
-pi.on("input", (event) => {
-  return { action: "transform", text: `[${ts()}] ${event.text}` };
-});
-```
-
-This was the [most requested feature](https://github.com/anthropics/claude-code/issues/44763) on Claude Code with 10+ duplicate issues — and no existing implementation anywhere.
 
 ## What we learned building it
 
@@ -108,7 +93,6 @@ git clone https://github.com/ankitg12/stretchly-sync ~/tools/stretchly-sync
 # Config (~/.omp/agent/config.yml)
 extensions:
   - ~/tools/stretchly-sync
-  - ~/tools/chat-timestamps
 
 # Config (~/.omp/agent/stretchly-sync.json)
 {
@@ -122,7 +106,6 @@ Requires [Stretchly](https://hovancik.net/stretchly/) running and the [fixed-tim
 ## Source
 
 - [stretchly-sync](https://github.com/ankitg12/stretchly-sync) — break detection, activity tracking, configurable onBreak prompt
-- [chat-timestamps](https://github.com/ankitg12/chat-timestamps) — per-message timestamps for OMP
 
 ---
 
