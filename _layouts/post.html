@@ -1,0 +1,40 @@
+---
+layout: base
+---
+<article class="post h-entry" itemscope itemtype="http://schema.org/BlogPosting">
+
+  <header class="post-header">
+    <h1 class="post-title p-name" itemprop="name headline">{{ page.title | escape }}</h1>
+    <div class="post-meta">
+      {%- assign date_format = site.minima.date_format | default: "%b %-d, %Y" -%}
+      {% assign pdate = page.date | date_to_xmlschema %}
+      <time class="dt-published" datetime="{{ pdate }}" itemprop="datePublished">
+        {{ pdate | date: date_format }}
+      </time>
+    </div>
+  </header>
+
+  {% if page.series %}
+  <div style="background:#f8f8f8;border:1px solid #ddd;border-radius:4px;padding:12px 16px;margin-bottom:24px;font-size:0.9em;">
+    <strong>Series: {{ page.series }}</strong>
+    <ol style="margin:8px 0 0 0;padding-left:20px;">
+      {% assign series_posts = site.posts | where: "series", page.series | sort: "date" %}
+      {% for post in series_posts %}
+      <li>
+        {% if post.url == page.url %}
+          {{ post.title }} <em>(this post)</em>
+        {% else %}
+          <a href="{{ post.url | relative_url }}">{{ post.title }}</a>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+
+  <div class="post-content e-content" itemprop="articleBody">
+    {{ content }}
+  </div>
+
+  <a class="u-url" href="{{ page.url | relative_url }}" hidden></a>
+</article>
