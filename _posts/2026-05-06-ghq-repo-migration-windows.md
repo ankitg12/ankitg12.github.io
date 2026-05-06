@@ -76,7 +76,7 @@ For each unique repo (keyed by `host/owner/repo` parsed from the remote URL):
 2. Only check dirty status on *losers* (repos to be deleted), not on winners being moved. Moving a repo with uncommitted changes is safe — `.git` travels intact. Dirty-checking winners adds O(n) `git status` calls on large repos like the Linux kernel or PowerShell source.
 3. Run `ghq migrate -y <winner>`, then delete clean losers.
 
-The script is in the references at the end if you want the full thing.
+The full script is [available as a gist](https://gist.github.com/ankitg12/052d65c7661c6524b528793b0556646e).
 
 ---
 
@@ -222,6 +222,7 @@ git config --global --unset worktree.useRelativePaths
 ## References
 
 - [ghq](https://github.com/x-motemen/ghq) — repo manager; `ghq migrate` since v1.10
+- [ghq-migrate.py gist](https://gist.github.com/ankitg12/052d65c7661c6524b528793b0556646e) — the bulk migration script
 - [gwq](https://github.com/d-kuro/gwq) — worktree manager, same conventions as ghq
 - [PSFzf](https://github.com/kelleyma49/PSFzf) — fzf keybindings for PowerShell (`Ctrl+T`, `Ctrl+R`)
 - [ghq + gwq + fzf for AI agents](https://dev.to/shunk031/a-coding-agent-friendly-environment-is-friendly-to-humans-too-ghq-gwq-fzf-2km0) — the article that surfaced gwq
