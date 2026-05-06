@@ -3,6 +3,7 @@ layout: post
 title: "Adding timestamps to AI coding agent conversations"
 date: 2026-04-27
 categories: ai agents productivity
+series: "AI coding agent productivity"
 ---
 
 AI coding agents don't show when things happened. You scroll back through a long session and can't tell if that tool call was 2 minutes ago or 20. The agent itself has no concept of elapsed time — it can't notice it's been stuck for 15 minutes.

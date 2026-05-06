@@ -3,6 +3,7 @@ layout: post
 title: "Break-time retrospection for AI coding agents"
 date: 2026-04-27
 categories: ai agents productivity
+series: "AI coding agent productivity"
 ---
 
 AI coding agents run for hours without pausing to reflect. Humans take breaks. This post describes wiring the two together: when [Stretchly](https://hovancik.net/stretchly/) fires a break, the agent stops, reviews what it did, and answers five standup questions before continuing.
