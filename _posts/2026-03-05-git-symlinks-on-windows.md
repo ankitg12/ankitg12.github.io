@@ -9,21 +9,21 @@ I spent a day debugging symlinks in a git repo on Windows. What started as "just
 
 ## The Setup
 
-We have a repo with a `scripts/all/` directory that contains symlinks to scripts in other directories ΓÇö a flat index for tab-completion:
+We have a repo with a `scripts/all/` directory that contains symlinks to scripts in other directories — a flat index for tab-completion:
 
 ```plaintext
 scripts/
-Γö£ΓöÇΓöÇ tools/
-Γöé   Γö£ΓöÇΓöÇ deploy.sh
-Γöé   Γö£ΓöÇΓöÇ cleanup.sh
-Γöé   ΓööΓöÇΓöÇ ...
-Γö£ΓöÇΓöÇ checks/
-Γöé   Γö£ΓöÇΓöÇ health.sh
-Γöé   ΓööΓöÇΓöÇ ...
+├── tools/
+│   ├── deploy.sh
+│   ├── cleanup.sh
+│   └── ...
+├── checks/
+│   ├── health.sh
+│   └── ...
 └── all/           ← symlinks to everything above
-    Γö£ΓöÇΓöÇ deploy.sh -> ../tools/deploy.sh
-    Γö£ΓöÇΓöÇ health.sh -> ../checks/health.sh
-    ΓööΓöÇΓöÇ ...
+    ├── deploy.sh -> ../tools/deploy.sh
+    ├── health.sh -> ../checks/health.sh
+    └── ...
 ```
 
 We renamed `scripts/tools/` to `scripts/operations/`. Symlinks broke. Simple, right? Just rebuild them. That's when things got interesting.
@@ -35,7 +35,7 @@ Windows treats file and directory symlinks differently. Git bash (`ln -s`) handl
 ```bash
 $ ln -s ../README.md LINK.md
 $ ls -la LINK.md
-lrwxrwxrwx 1 user 1049089 48 LINK.md -> ../README.md  # Γ£ô proper symlink
+lrwxrwxrwx 1 user 1049089 48 LINK.md -> ../README.md  # ✓ proper symlink
 ```
 
 But directory symlinks created the same way? They silently become **copies**:
@@ -65,18 +65,18 @@ os.symlink("../../features/myfeature", "myfeature", target_is_directory=True)
 After creating file symlinks with `ln -s` in git bash, they worked perfectly in bash:
 
 ```bash
-$ cat scripts/all/deploy.sh  # Γ£ô reads through symlink fine
+$ cat scripts/all/deploy.sh  # ✓ reads through symlink fine
 $ readlink scripts/all/deploy.sh
-../operations/deploy.sh  # Γ£ô correct target
+../operations/deploy.sh  # ✓ correct target
 ```
 
 But Python disagreed:
 
 ```python
 >>> os.path.islink("scripts/all/deploy.sh")
-True   # Γ£ô yes, it's a symlink
+True   # ✓ yes, it's a symlink
 >>> os.path.exists("scripts/all/deploy.sh")
-False  # Γ£ù but it "doesn't exist"?!
+False  # ✗ but it "doesn't exist"?!
 >>> os.stat("scripts/all/deploy.sh")
 WinError 123: The filename, directory name, or volume label syntax is incorrect
 ```
@@ -92,7 +92,7 @@ Setting `MSYS=winsymlinks:nativestrict` before `ln -s` creates proper native Win
 ```bash
 $ MSYS=winsymlinks:nativestrict ln -sf "../operations/deploy.sh" "scripts/all/deploy.sh"
 $ python3 -c "import os; print(os.path.exists('scripts/all/deploy.sh'))"
-True  # Γ£ô finally!
+True  # ✓ finally!
 ```
 
 But this has a performance problem...
@@ -146,7 +146,7 @@ $ git cat-file -p :scripts/all/deploy.sh
 ../operations/deploy.sh  # forward slashes in git
 ```
 
-Even if you create a symlink with backslashes on disk, git stores forward slashes. On checkout, git recreates the symlink ΓÇö and depending on your `core.symlinks` setting and MSYS configuration, you might get forward or backslash targets.
+Even if you create a symlink with backslashes on disk, git stores forward slashes. On checkout, git recreates the symlink — and depending on your `core.symlinks` setting and MSYS configuration, you might get forward or backslash targets.
 
 ## The Solution
 
@@ -221,6 +221,6 @@ git config core.symlinks true
 
 ## Key Takeaway
 
-Symlinks on Windows are not broken ΓÇö they're just picky about separators. Use Python's `os.symlink` with `os.path.join` for cross-platform compatibility, and avoid bash `ln -s` in loops on Windows (AV scanning makes it 100x slower).
+Symlinks on Windows are not broken — they're just picky about separators. Use Python's `os.symlink` with `os.path.join` for cross-platform compatibility, and avoid bash `ln -s` in loops on Windows (AV scanning makes it 100x slower).
 
 The deeper lesson: when something "works in bash but not in Python" on Windows, it's almost always a forward-slash vs backslash issue in path resolution.

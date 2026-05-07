@@ -11,27 +11,27 @@ categories: devto api tutorial
 
 ---
 
-This is the second post in a two-part series. The [first post](https://dev.to/ankitg12/getting-unix-tools-to-work-in-powershell-a-debugging-war-story-1ipl) covers getting Unix tools (`grep`, `ls -lt`, `sed`, `awk`) working in PowerShell ΓÇö and cost ~102,000 tokens to figure out. Once the post was written, the natural next question was: can we skip the browser and publish it programmatically?
+This is the second post in a two-part series. The [first post](https://dev.to/ankitg12/getting-unix-tools-to-work-in-powershell-a-debugging-war-story-1ipl) covers getting Unix tools (`grep`, `ls -lt`, `sed`, `awk`) working in PowerShell — and cost ~102,000 tokens to figure out. Once the post was written, the natural next question was: can we skip the browser and publish it programmatically?
 
-Turns out ΓÇö yes, but not how you'd expect. Here's what we tried and what actually worked.
+Turns out — yes, but not how you'd expect. Here's what we tried and what actually worked.
 
 ---
 
-## Attempt 1: Medium API ΓÇö Dead on Arrival
+## Attempt 1: Medium API — Dead on Arrival
 
 Medium was the first choice. They used to have a clean REST API. Not anymore.
 
 > "Medium will not be issuing any new integration tokens for our API and will not allow any new integrations."
 
-The GitHub repo was archived in **March 2023**. Existing tokens still work ΓÇö but if you don't already have one, you can't get one. A paid membership doesn't help either.
+The GitHub repo was archived in **March 2023**. Existing tokens still work — but if you don't already have one, you can't get one. A paid membership doesn't help either.
 
 **Workaround:** Publish to dev.to first, then use Medium's [Import a Story](https://medium.com/p/import) tool to pull the URL in. Medium even sets the canonical URL back to dev.to, which is good for SEO.
 
 ---
 
-## Attempt 2: devto-cli ΓÇö Almost
+## Attempt 2: devto-cli — Almost
 
-[`devto-cli`](https://github.com/sinedied/devto-cli) by sinedied is the right idea ΓÇö a purpose-built npm CLI for publishing markdown files to dev.to:
+[`devto-cli`](https://github.com/sinedied/devto-cli) by sinedied is the right idea — a purpose-built npm CLI for publishing markdown files to dev.to:
 
 ```bash
 npm install -g @sinedied/devto-cli
@@ -45,13 +45,13 @@ No GitHub repository provided.
 Use --repo option or .env file to provide one.
 ```
 
-`devto-cli` requires a GitHub repo because it rewrites relative image URLs to point to raw GitHub content. Smart for image hosting ΓÇö but unnecessary overhead for a text-only post with no images.
+`devto-cli` requires a GitHub repo because it rewrites relative image URLs to point to raw GitHub content. Smart for image hosting — but unnecessary overhead for a text-only post with no images.
 
 Could pass `--repo username/repo` and move on, but at this point it felt like the tool was doing more than needed.
 
 ---
 
-## Attempt 3: curl ΓÇö Works, No Ceremony
+## Attempt 3: curl — Works, No Ceremony
 
 dev.to has a straightforward REST API. The API key is still alive and well (unlike Medium's). A minimal test first:
 
@@ -73,7 +73,7 @@ import json
 with open("article.md", encoding="utf-8") as f:
     content = f.read()
 
-# Strip H1 title ΓÇö dev.to uses the title field separately
+# Strip H1 title — dev.to uses the title field separately
 body = "\n".join(content.split("\n")[2:]).strip()
 
 payload = {
@@ -133,7 +133,7 @@ To preview a draft, go to **dev.to/dashboard**, open the draft, and dev.to gener
 https://dev.to/username/slug?preview=<long_token>
 ```
 
-This is expected behavior ΓÇö drafts are private until published.
+This is expected behavior — drafts are private until published.
 
 ---
 
@@ -141,15 +141,15 @@ This is expected behavior ΓÇö drafts are private until published.
 
 ```
 Write markdown locally
-       Γåô
+       ↓
 python3 build_payload.py       # build payload.json
-       Γåô
+       ↓
 curl --data @payload.json      # POST to dev.to (draft)
-       Γåô
+       ↓
 Review on dev.to dashboard
-       Γåô
+       ↓
 Hit Publish
-       Γåô
+       ↓
 Import URL into Medium         # medium.com/p/import
 ```
 
@@ -169,6 +169,6 @@ Import URL into Medium         # medium.com/p/import
 
 ## Further Reading
 - [dev.to API docs](https://developers.forem.com/api)
-- [sinedied/devto-cli](https://github.com/sinedied/devto-cli) ΓÇö good if you have images or want a Git-based workflow
-- [Medium Import](https://medium.com/p/import) ΓÇö the only reliable programmatic path into Medium today
-- [Part 1: Getting Unix Tools to Work in PowerShell](https://dev.to/ankitg12/getting-unix-tools-to-work-in-powershell-a-debugging-war-story-1ipl) ΓÇö the post that triggered this whole publishing adventure
+- [sinedied/devto-cli](https://github.com/sinedied/devto-cli) — good if you have images or want a Git-based workflow
+- [Medium Import](https://medium.com/p/import) — the only reliable programmatic path into Medium today
+- [Part 1: Getting Unix Tools to Work in PowerShell](https://dev.to/ankitg12/getting-unix-tools-to-work-in-powershell-a-debugging-war-story-1ipl) — the post that triggered this whole publishing adventure
