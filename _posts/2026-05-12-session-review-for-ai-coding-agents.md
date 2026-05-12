@@ -144,5 +144,5 @@ Python 3 in PATH. The skill reads `~/.omp/agent/sessions/**/*.jsonl` — no othe
 ## Source
 
 - [claude-config](https://github.com/ankitg12/claude-config) — `skills/review-sessions/` including `extract.py`
-- [agentpatterns.ai: Session Logging](https://agentpatterns.ai/observability/session-logging/) — the broader pattern
+- [agentpatterns.ai: Session Recap](https://agentpatterns.ai/agent-design/session-recap/) — goal-shaped handoff at context boundaries
 - [dateparser](https://dateparser.readthedocs.io/) — natural language time parsing used by the extractor
