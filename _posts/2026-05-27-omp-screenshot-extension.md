@@ -120,14 +120,49 @@ The log showed the exact failure:
 
 ---
 
-## Final extension
+## Attempt 4 — `stdio: 'pipe'` (partial fix)
+
+Adding `stdio: 'pipe'` to `spawnSync` isolates the child from OMP's terminal. It worked once — then failed again with the same 78ms pattern.
+
+The real problem isn't PTY inheritance. It's `spawnSync` itself.
+
+---
+
+## The actual root cause — blocking the event loop
+
+OMP extensions run on Node.js's single event loop. `spawnSync` blocks that loop entirely while waiting for the child process. When OMP is busy (rendering the TUI, processing a notification, handling the result of the previous tool call), a blocked event loop means OMP can't service its own internal timers and callbacks. The spawned process gets killed by the runtime before it can complete.
+
+This is the same issue documented for any OMP extension using `spawnSync`: it works when the event loop is idle (first call after load), fails intermittently when OMP is active.
+
+The fix: replace `spawnSync` with async `spawn` so the event loop stays free:
 
 ```typescript
-const result = spawnSync(PYTHON, [
-  "-c",
-  `from PIL import ImageGrab; ImageGrab.grab().save(r'${out}')`,
-], { timeout: 30_000, windowsHide: true, stdio: 'pipe' });
+function capture(out: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(PYTHON, [
+      "-c",
+      `from PIL import ImageGrab; ImageGrab.grab().save(r'${out}')`,
+    ], { stdio: "pipe", windowsHide: true });
+
+    child.stderr.on("data", (d) => stderr.push(d.toString()));
+    child.on("close", (code) => code === 0 ? resolve() : reject(...));
+    child.on("error", reject);
+    setTimeout(() => { child.kill(); reject(new Error("timed out")); }, 30_000);
+  });
+}
+
+// in the command handler:
+handler: async (_args, ctx) => {
+  await capture(out);   // non-blocking — OMP stays responsive
+  ...
+}
 ```
+
+Required a full session restart to load cleanly. After that: works every time.
+
+---
+
+## Final extension
 
 Full source: [github.com/ankitg12/omp-screenshot](https://github.com/ankitg12/omp-screenshot)
 
@@ -139,12 +174,12 @@ Full source: [github.com/ankitg12/omp-screenshot](https://github.com/ankitg12/om
 |----------------|---------------|
 | PowerShell is fine for a quick screen capture | 13s cold start. Use PIL. |
 | `pwsh` is in PATH | Not in OMP's spawn environment. Use full path. |
-| 10s timeout is enough | Not with PTY inheritance killing the child in 78ms |
-| RPC test = proof it works | RPC is headless. Interactive TUI behaves differently. |
-| `status=null` means timeout | It means the process was killed — PTY, signal, or spawn failure |
-| More timeout fixes ETIMEDOUT | `stdio: 'pipe'` fixes it. Timeout is irrelevant when the child dies in 78ms. |
+| `spawnSync` is fine for a short operation | Blocks OMP's event loop — fails intermittently under load |
+| RPC test = proof it works | RPC is headless and idle. Interactive TUI is busy. |
+| `stdio: 'pipe'` fixes the ETIMEDOUT | It doesn't. The event loop block is the cause. Use async `spawn`. |
+| Hot-reload picks up the fix | For async handler changes, full session restart required. |
 
-The working extension is 52 lines. The journey to get there was not.
+The working extension is 65 lines. The journey to get there was not.
 
 ---
 
@@ -153,4 +188,4 @@ The working extension is 52 lines. The journey to get there was not.
 - [github.com/ankitg12/omp-screenshot](https://github.com/ankitg12/omp-screenshot)
 - [github.com/can1357/oh-my-pi](https://github.com/can1357/oh-my-pi) — OMP extension API
 - [PIL ImageGrab docs](https://pillow.readthedocs.io/en/stable/reference/ImageGrab.html)
-- [Node.js spawnSync — stdio option](https://nodejs.org/api/child_process.html#child_processspawnsynccommand-args-options)
+- [Node.js child_process.spawn](https://nodejs.org/api/child_process.html#child_processspawncommand-args-options)
