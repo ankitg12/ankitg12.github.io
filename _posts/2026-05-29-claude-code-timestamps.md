@@ -80,10 +80,13 @@ elif mode == "stop":
 What you see at the end of each turn:
 
 ```
+[09:21:17 AM] — user message received (after 47m33s idle)
+[09:21:19 AM] read completed
 [09:21:44 AM] — response complete (27.3s) | session 4m12s
+[09:22:01 AM] — session ending (logout) — Claude 4m12s | wall 47m33s
 ```
 
-Two numbers: this turn, and the running total of all turns in the session.
+Four distinct moments, one number per line.
 
 ### Session state is keyed by session_id
 
@@ -123,9 +126,17 @@ The gap is your think/type/read time. A 47-minute session where Claude computed 
 
 ---
 
-## Settings.json
+## Install
 
-Add this `hooks` block to `~/.claude/settings.json` (merge with existing — don't overwrite):
+**Plugin (one command):**
+
+```
+/plugin add --from https://github.com/ankitg12/claude-code-timestamps
+```
+
+No settings.json editing — the plugin wires all 12 hooks automatically. Requires Python 3 on PATH as `python`.
+
+**Manual — add to `~/.claude/settings.json`:**
 
 ```json
 {
@@ -146,9 +157,7 @@ Add this `hooks` block to `~/.claude/settings.json` (merge with existing — don
 }
 ```
 
-> **Windows:** replace `~/.claude/hooks/timestamps.py` with the full path, e.g. `C:/Users/YourName/.claude/hooks/timestamps.py`
-
-Settings are file-watched — run `/hooks` to reload, no restart needed.
+> **Windows:** replace `~/.claude/hooks/timestamps.py` with the full path. Run `/hooks` to reload — no restart.
 
 ---
 
@@ -166,7 +175,7 @@ Settings are file-watched — run `/hooks` to reload, no restart needed.
 
 **[s-a-s-k-i-a/claude-code-timestamps](https://github.com/s-a-s-k-i-a/claude-code-timestamps)** — a `/timestamps` command that reads your session's JSONL transcript and renders a retrospective message timeline: `14:02 You / 14:05 Claude`. Complementary to this script — it shows *history*, while `timestamps.py` stamps *in real time*. Worth running both.
 
-**[clankercode/claude-inject-idle-time](https://github.com/clankercode/claude-inject-idle-time)** — a plugin with a live statusline elapsed timer and `[after 5m 2s]` injection when you send a prompt after >1 minute idle. Also injects hidden timing context to the model each turn. Two things `timestamps.py` doesn't do: statusline timer and idle-gap annotation.
+**[clankercode/claude-inject-idle-time](https://github.com/clankercode/claude-inject-idle-time)** — a plugin with a live statusline elapsed timer. The idle-gap annotation pattern is now also in `timestamps.py` (learned from this project). One thing `timestamps.py` still doesn't do: statusline elapsed timer.
 
 **[pleasedodisturb fork](https://github.com/pleasedodisturb/claude-inject-idle-time/tree/add-mcp-time-tools)** — combines both of the above plus MCP time-query tools and the `/timestamps N` retrospective view in one install: `claude plugin add --from https://github.com/pleasedodisturb/claude-inject-idle-time`.
 
