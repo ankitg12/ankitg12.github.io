@@ -162,11 +162,19 @@ Settings are file-watched — run `/hooks` to reload, no restart needed.
 
 ## Prior art
 
-The [most-requested CC feature](https://github.com/anthropics/claude-code/issues/23655) is built-in timestamp injection — 10+ duplicate issues, not yet shipped. The workaround has been single-event hooks (UserPromptSubmit only). The closest existing tool is [claude-code-session-timer-hook](https://github.com/jeecgboot/claude-code-session-timer-hook) by jeecgboot — it covers 4 events (SessionStart, UserPromptSubmit, Stop, SessionEnd) and outputs `Turn: 4.72s · Total 1m18s`. The `timestamps.py` script started from that design and extends it to 12 events, absorbing the session timing into a single consolidated Stop line.
+[Issue #44763](https://github.com/anthropics/claude-code/issues/44763) — "Show timestamps on conversation messages" — is the active upstream thread, open since April 2026, 15+ comments, not yet shipped. Several community tools have emerged from it:
 
-[claude-hook-utils](https://github.com/RasmusGodske/claude-hook-utils) by RasmusGodske provides typed Python dataclasses for hook stdin — eliminates `data.get(...)` in complex validators. Worth knowing, not worth adding here: it covers 4 events, requires pip install, and the 12 `data.get()` calls in `timestamps.py` are trivially simple.
+**[s-a-s-k-i-a/claude-code-timestamps](https://github.com/s-a-s-k-i-a/claude-code-timestamps)** — a `/timestamps` command that reads your session's JSONL transcript and renders a retrospective message timeline: `14:02 You / 14:05 Claude`. Complementary to this script — it shows *history*, while `timestamps.py` stamps *in real time*. Worth running both.
 
-The [cc-safe-setup](https://github.com/yurukusa/cc-safe-setup) collection (677 hooks, Shell) covers safety and autonomy patterns — destructive command blocking, secret scanning, context monitoring. No timestamp hooks in the collection; orthogonal problem.
+**[clankercode/claude-inject-idle-time](https://github.com/clankercode/claude-inject-idle-time)** — a plugin with a live statusline elapsed timer and `[after 5m 2s]` injection when you send a prompt after >1 minute idle. Also injects hidden timing context to the model each turn. Two things `timestamps.py` doesn't do: statusline timer and idle-gap annotation.
+
+**[pleasedodisturb fork](https://github.com/pleasedodisturb/claude-inject-idle-time/tree/add-mcp-time-tools)** — combines both of the above plus MCP time-query tools and the `/timestamps N` retrospective view in one install: `claude plugin add --from https://github.com/pleasedodisturb/claude-inject-idle-time`.
+
+**[claude-code-session-timer-hook](https://github.com/jeecgboot/claude-code-session-timer-hook)** — 4-event session timer (SessionStart, UserPromptSubmit, Stop, SessionEnd), outputs `Turn: 4.72s · Total 1m18s`. The design `timestamps.py` started from, extended to 12 events with the session timing consolidated into a single Stop line.
+
+**[claude-hook-utils](https://github.com/RasmusGodske/claude-hook-utils)** — typed Python dataclasses for hook stdin; eliminates `data.get(...)` in complex validators. Covers 4 events, requires pip install. Not used here — the `data.get()` calls in `timestamps.py` are trivially simple and adding a dependency would break the zero-dep install.
+
+**[cc-safe-setup](https://github.com/yurukusa/cc-safe-setup)** — 677 Shell hooks covering safety and autonomy: destructive command blocking, secret scanning, context monitoring. No timestamp hooks; orthogonal.
 
 ---
 
@@ -174,8 +182,9 @@ The [cc-safe-setup](https://github.com/yurukusa/cc-safe-setup) collection (677 h
 
 - [claude-code-timestamps](https://github.com/ankitg12/claude-code-timestamps) — the script, English + Hindi README, copy-paste install block
 - [Timestamps for AI coding agents]({% post_url 2026-04-27-timestamps-for-ai-coding-agents %}) — the OMP/Pi version this builds on (TypeScript, status bar, system prompt injection)
+- [s-a-s-k-i-a/claude-code-timestamps](https://github.com/s-a-s-k-i-a/claude-code-timestamps) — retrospective transcript timeline; pairs well with this script
+- [clankercode/claude-inject-idle-time](https://github.com/clankercode/claude-inject-idle-time) — statusline elapsed timer and idle-gap injection; covers what this script doesn't
 - [Clock-aligned retrospection]({% post_url 2026-05-06-clock-aligned-retro-for-ai-agents %}) — why session timing matters: structured interruption at known intervals
 - [Personal Agentic Process]({% post_url 2026-05-06-personal-agentic-process %}) — the broader discipline timestamps feed into
-- [claude-code-session-timer-hook](https://github.com/jeecgboot/claude-code-session-timer-hook) — jeecgboot's 4-event session timer, the prior art `timestamps.py` extends
 - [Claude Code hooks reference](https://code.claude.com/docs/en/hooks) — full event schema and output format documentation
-- [GitHub issue #23655](https://github.com/anthropics/claude-code/issues/23655) — the upstream request for built-in timestamp injection
+- [GitHub issue #44763](https://github.com/anthropics/claude-code/issues/44763) — the upstream request; community workarounds documented in comments
