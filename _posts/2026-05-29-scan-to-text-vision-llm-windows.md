@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Scanning handwritten notes to text on Windows — why Tesseract fails and what to use instead"
+title: "Scanner to Agent: building a /scan command on Windows with NAPS2 and vision LLM"
 date: 2026-05-29
 categories: ai tools windows productivity
 ---
