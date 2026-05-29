@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "Scanner to Agent: building a /scan command on Windows with NAPS2 and vision LLM"
+title: "Scanner to Agent: integrating a flatbed scanner as an AI coding agent extension on Windows"
 date: 2026-05-29
 categories: ai tools windows productivity
 ---
