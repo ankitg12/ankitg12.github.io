@@ -191,5 +191,5 @@ python build.py
 
 ## Source
 
-Build scripts: `agentpatterns-build/` (private — available on request).
+Build scripts: **[github.com/ankitg12/agentpatterns-build](https://github.com/ankitg12/agentpatterns-build)**
 Dependencies: `pandoc 3.9`, `xelatex` (MiKTeX), `mmdc 11.12`, `python 3.14`, `pyyaml`.
