@@ -156,4 +156,4 @@ Top Skill Candidates
 
 ## Source
 
-`avmine.py` is in [ankitg12/ankitg-tools](https://github.com/ankitg12/ankitg-tools). No dependencies beyond stdlib — just `sqlite3`, `urllib.request`, `json`, `argparse`. agentsview must be installed and synced (`agentsview sync`) before running.
+`avmine.py` is available as a [GitHub Gist](https://gist.github.com/ankitg12/a058f959a7b67a5a42d2f845445e299d) and in [ankitg12/ankitg-tools](https://github.com/ankitg12/ankitg-tools). No dependencies beyond stdlib — just `sqlite3`, `urllib.request`, `json`, `argparse`. agentsview must be installed and synced (`agentsview sync`) before running.
