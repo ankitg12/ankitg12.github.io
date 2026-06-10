@@ -120,13 +120,18 @@ def _shorten(url: str, title: str) -> str:
         )
     return h
 
+```python
+# threshold adapts to terminal width; falls back to 66 in OMP's piped context
+threshold = int(os.environ.get("COLUMNS", "72")) - 6
+
 # in the output loop:
-if len(url) > 120:
-    code  = _shorten(url, title)
-    short = f"http://localhost:{PORT}/{code}"
+if len(url) > threshold:
+    code    = _shorten(url, title)
+    short   = f"http://localhost:{PORT}/{code}"
+    dim_url = url if len(url) <= threshold else url[:threshold - 1] + "…"
     console.print(f"[bold]{title}[/bold]")
     console.print(f"   [cyan]{short}[/cyan]")
-    console.print(f"   [dim]{url}[/dim]")   # visible, not clickable, just for context
+    console.print(f"   [dim]{dim_url}[/dim]")
 else:
     console.print(f"[bold]{title}[/bold]")
     console.print(f"   [cyan]{url}[/cyan]")
