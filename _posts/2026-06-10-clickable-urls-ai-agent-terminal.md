@@ -164,6 +164,17 @@ osc8_ok = bool(os.environ.get("WEZTERM_PANE"))
 
 ---
 
+## Related projects
+
+If you want a pre-built local URL shortener rather than rolling your own:
+
+- **[shortiepy](https://github.com/CheapNightbot/shortiepy)** — Python, pip-installable, same localhost approach. More complete (custom slugs, expiry, web UI). Heavier than two files but production-ready.
+- **[billsmonster/URLshortiner](https://github.com/billsmonster/URLshortiner)** — minimal Python CLI local shortener, closer in spirit to what we built.
+- **[Shlink](https://shlink.io/)** — the serious self-hosted option. PHP, Docker, full API. Overkill for a dev terminal but the right choice if you want a team-shared instance.
+- **[OSC8-Adoption](https://github.com/Alhadis/OSC8-Adoption)** — tracker for which terminals, tools, and libraries support OSC 8 hyperlinks. Good reference before deciding whether to invest in the escape-sequence path.
+
+---
+
 Code: [gist.github.com/ankitg12/f3e9f955455fc303553ce51f54ebf658](https://gist.github.com/ankitg12/f3e9f955455fc303553ce51f54ebf658)
 
 OMP issue filed for upstream fix: [oh-my-pi#2221](https://github.com/can1357/oh-my-pi/issues/2221)
