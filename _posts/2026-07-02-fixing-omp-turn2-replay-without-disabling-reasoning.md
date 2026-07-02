@@ -6,9 +6,11 @@ categories: ai agents productivity
 series: "AI coding agent productivity"
 ---
 
-A reasoning-capable model worked on turn 1, then died on turn 2.
+One fine Wednesday morning I updated OMP and my Claude Sonnet 4.6 (`claude-sonnet-4-6`) sessions stopped working — this is a story of getting them back up again.
 
-Not always. Only when OMP resumed the same session and replayed prior reasoning state to a custom model proxy. Turn 1 looked fine, which made the bug easy to misdiagnose. A one-turn smoke test passed. A real conversation failed.
+Turn 1 still looked fine, which made the bug easy to misdiagnose. The real failure showed up on turn 2: sometimes in the same live session, sometimes after `--resume`, and sometimes as a silent fallback to another model if I was not watching the JSONL closely.
+
+I filed the upstream request as [OMP issue #4060](https://github.com/can1357/oh-my-pi/issues/4060) once it was clear this was about adaptive-thinking replay, not just a bad one-off session.
 
 The first workaround I found was blunt: disable thinking globally. It worked, but it also degraded every model in OMP. The better result came later: a **model-local** config that kept reasoning enabled, switched away from the problematic adaptive path, and still survived turn 2.
 
@@ -20,11 +22,10 @@ This post documents that progression, the traps on the way, and the exact verifi
 
 The failure mode was specific:
 
-1. Start a fresh OMP session on the affected reasoning-capable model
+1. Start a fresh OMP session on Claude Sonnet 4.6 (`claude-sonnet-4-6`) through the affected Anthropic-compatible proxy
 2. Ask a simple prompt
-3. Resume the same session
-4. Ask a second prompt
-5. Watch turn 2 fail or silently fall back to another model
+3. Ask a second prompt in the same live session — or resume the session and ask it there
+4. Watch turn 2 fail or silently fall back to another model
 
 That last part matters. If your config has fallback chains, turn 2 can appear to "work" even when the target model actually failed and OMP switched providers behind your back.
 
@@ -64,13 +65,12 @@ But it is not the best steady state.
 
 The stronger workaround lives in `models.yml`, on the affected model entry itself.
 
-In pseudocode:
-
 ```yaml
-- id: target-model
+- id: claude-sonnet-4-6
+  name: Claude Sonnet 4.6
   reasoning: true
   thinking:
-    mode: <non-adaptive effort mode>
+    mode: anthropic-budget-effort
     efforts: [low, medium, high]
     defaultLevel: low
 ```
@@ -90,10 +90,10 @@ This is the important distinction: the final fix was **not** "turn thinking off 
 
 ## The verification pattern
 
-A proper repro needs a real resumed session:
+A proper repro needs a real second turn on Claude Sonnet 4.6 (`claude-sonnet-4-6`), not just turn 1. In my testing the failure could appear either on turn 2 of the same live session or on turn 2 after `--resume`. The resumed form was easier to script and inspect, so this is the concrete variant I used:
 
 ```bash
-omp --session-dir ~/tmp/turn2-repro --model custom/target-model --mode json -p "Reply with exactly: turn1-ok"
+omp --session-dir ~/tmp/turn2-repro --model amd-claude/claude-sonnet-4-6 --mode json -p "Reply with exactly: turn1-ok"
 omp --session-dir ~/tmp/turn2-repro --resume <session-id> --mode json -p "Reply with exactly: turn2-ok"
 ```
 
@@ -116,7 +116,7 @@ That last check is what upgraded this from a blunt workaround to a real fix.
 
 ### 1. One-turn tests lie
 
-Turn 1 was never the real problem. The bug only showed up when OMP replayed prior reasoning on a resumed turn.
+Turn 1 was never the real problem. The bug showed up on the second turn — in the same live session or after OMP resumed prior reasoning.
 
 If you stop at a single prompt, you can easily declare victory on a broken config.
 
@@ -171,7 +171,7 @@ I initially tried a minimal `--config` file just to disable fallback for testing
 The safer path was:
 
 - test against the **real** config
-- then verify the resumed session JSONL still shows the same provider/model on turn 2
+- then verify the turn-2 JSONL still shows the same provider/model
 
 That is slower than forcing fallback off in a tiny overlay, but it is more trustworthy.
 
@@ -209,16 +209,16 @@ One more nuance: on newer reasoning-model behavior, older manual budget-style co
 
 If I hit this again, I would use this order immediately:
 
-1. **Confirm the bug with a real resumed turn**
-   - never trust turn 1 alone
+1. **Confirm the bug with a real second turn**
+   - same live session or resumed session, but never trust turn 1 alone
 2. **Use the global off-switch only as an emergency unblocker**
    - `defaultThinkingLevel: off`
    - `omitThinking: true`
-3. **Move to the narrower model-local fix**
+3. **Move to the narrower model-local fix for Claude Sonnet 4.6**
    - switch from adaptive reasoning to a non-adaptive effort-based mode
    - start with `defaultLevel: low`
 4. **Verify turn 2 stayed on the intended model and still carried reasoning**
-5. **Only then** think about whether the runner itself should grow a cleaner provider-scoped setting
+5. **Only then** think about whether the runner itself should grow a cleaner provider-scoped setting, as discussed in [OMP issue #4060](https://github.com/can1357/oh-my-pi/issues/4060)
 
 That ordering would have saved me a lot of tokens.
 
@@ -245,10 +245,11 @@ If you collapse them into one question, you either patch too early or settle for
 ## Final config shape I would keep
 
 ```yaml
-- id: target-model
+- id: claude-sonnet-4-6
+  name: Claude Sonnet 4.6
   reasoning: true
   thinking:
-    mode: <non-adaptive effort mode>
+    mode: anthropic-budget-effort
     efforts: [low, medium, high]
     defaultLevel: low
 ```
@@ -264,6 +265,7 @@ omitThinking: true
 
 ## Source
 
-- local reproduction notes
+- [OMP issue #4060](https://github.com/can1357/oh-my-pi/issues/4060)
+- local reproduction notes for Claude Sonnet 4.6 (`claude-sonnet-4-6`)
 - runner config schema for model-level thinking
 - public provider docs on reasoning token billing and effort controls
