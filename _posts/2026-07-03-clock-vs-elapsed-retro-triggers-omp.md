@@ -94,6 +94,22 @@ assert(due2 === due1, "wake-from-sleep preserve does not move the due time");
 
 Nine assertions — drift-on-wake, busy-loop-on-skip, fresh-reset-on-real-fire, clock-mode-ignores-origin, no-catch-up-on-new-session — catch the whole class of bug without spinning up a session. Cheap enough that it's staying in the repo as a permanent regression check.
 
+## A second bug, found the same day: handoff leaves the clock running
+
+Hours after shipping the fix above, an hourly retro fired reporting a 60-minute segment that spanned backward across an OMP session **handoff** — the retro's own "arc of the hour" included work from a different conversation entirely, one that had already ended.
+
+The first hypothesis was reasonable and wrong: `agent-retro-omp` only reset its per-schedule state (`activityBuffer`, `segmentStarts`, elapsed-mode due-times) on the `session_start` lifecycle event. A handoff/resume that keeps the same extension host alive was assumed to skip `session_start` and inherit stale state — so the fix seemed to be listening for `session_switch` too, which OMP already emits for `/resume`, `/fork`, and `--continue`. That part shipped ([`agent-retro-omp@66a9c28`](https://github.com/ankitg12/agent-retro-omp/commit/66a9c28a2a3b14d3f6c57a146e8347307cf4e2fa)): the reset logic was pulled into a pure, OMP-independent `resetRetroStateForNewSession()` in `retro-state.ts`, shared by both `session_start` and a new `session_switch` handler, with a smoke test importing the real function instead of a hand-copied mirror.
+
+It fixes `/resume`, `/fork`, and `--continue`. It does not fix `/handoff` — because `/handoff` isn't wired to either event.
+
+Reading `AgentSession.handoff()` in OMP core directly settled it: manual and auto-triggered handoff both call the **low-level** `SessionManager.newSession()`, not the higher-level `AgentSession.newSession()`/`switchSession()` that emit `session_switch`. Handoff resets the agent in place (`agent.reset()`) and injects the carried-forward summary as a `custom_message` entry — but emits **no extension hook at all**. Worse, `session_stop` is *deliberately* skipped whenever a continuation is queued (there's a comment in the source to that effect — hook continuations there would race the handoff), and `session_shutdown` never fires because the process never exits. Every plausible hook is either silent or explicitly suppressed for this one transition.
+
+That rules out fixing it from inside the extension. A `registerCommand("handoff", ...)` shadow doesn't work — OMP's TUI command discovery filters extension commands through a reserved-name list and skips collisions with a warning. Injecting a message from the `input` hook doesn't work either — `input` fires before slash-command dispatch, but `handleHandoffCommand()` is awaited synchronously right after, so anything an extension queues races the handoff's own `agent.reset()` with no ordering guarantee.
+
+So the fix isn't a workaround, it's a missing hook — filed upstream as [can1357/oh-my-pi#4434](https://github.com/can1357/oh-my-pi/issues/4434): extend the existing `SessionSwitchEvent.reason` union (currently `"new" | "resume" | "fork"`) with `"handoff"`, emitted right before the old session's state is torn down, so an extension gets the one thing it actually needs — a chance to look at the *outgoing* session before it's gone, not just a signal that a new one started. If it lands, `agent-retro-omp`'s existing `session_switch` handler picks up handoff coverage for free.
+
+Until then, the honest status is: `/resume`/`/fork`/`--continue` are fixed and tested; `/handoff` is diagnosed, documented, and reported — not patched. There wasn't a safe local fix to ship.
+
 ---
 
 ## Repo
