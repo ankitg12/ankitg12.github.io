@@ -61,7 +61,7 @@ Results for one active project, after several months of use:
 
 `learned.md` alone was the single largest thing in context — bigger than the entire consolidated memory pipeline combined, and bigger than the project's own instruction file (~1,600 tokens). A feature meant to save a few hundred tokens of re-discovery per fact had, at 100 accumulated entries, become the dominant cost of every session.
 
-The natural instinct — "run the rebuild command" — doesn't touch it. `/memory rebuild` reprocesses `raw_memories.md` through the Phase 1/2 pipeline. `learned.md` is a completely separate code path with its own template variable (`{{learned}}` vs `{{memory_summary}}` in the prompt template) and no rebuild hook of its own.
+The natural instinct — "run the rebuild command" — doesn't touch it. `/memory rebuild` reprocesses `raw_memories.md` through the Phase 1/2 pipeline. `learned.md` is a completely separate code path with its own template variable ({% raw %}`{{learned}}`{% endraw %} vs {% raw %}`{{memory_summary}}`{% endraw %} in the prompt template) and no rebuild hook of its own.
 
 And the entry-count cap doesn't help here, because eviction is pure FIFO-by-age: it drops the *oldest* entry once you're past 100, regardless of whether that entry is stale, redundant, or the single most useful thing in the file. A verbose, narrative, half-duplicate entry written last week outranks a terse, load-bearing fact written six months ago — purely because it's newer. The cap bounds *disk size*; it does nothing for *signal density*, which is the thing that actually costs context tokens.
 
