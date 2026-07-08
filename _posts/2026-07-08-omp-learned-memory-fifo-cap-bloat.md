@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "A memory feature that's capped by count, not by usefulness"
+title: "The OMP memory feature that quietly cost me 33,000 tokens of context"
 date: 2026-07-08
 categories: ai agents productivity
 series: "AI coding agent productivity"
