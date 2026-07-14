@@ -6,6 +6,8 @@ categories: ai agents productivity
 series: "AI coding agent productivity"
 ---
 
+**Update, same day:** the ActivityWatch-based design below shipped, then broke on first real use — a desktop-wide AFK signal doesn't know which OMP session you're paying attention to, and doesn't know the difference between "away from keyboard" and "watching the agent work through a long multi-turn run with your hands off the keys." Both are real bugs, not edge cases. The fix, shipped a few minutes later: drop ActivityWatch entirely, track raw terminal keystrokes *in this specific session* via OMP's own `onTerminalInput` hook, and pause the debounce clock while the agent itself is mid-turn (`agent_start`/`agent_end`). Simpler, exact, zero external dependency. The AW-based mechanics below are left as-written for the record of how the idea evolved — see the [commit](https://github.com/ankitg12/agent-afk-omp/commit/7d08f66) for the corrected version.
+
 The [AFK toggle]({% post_url 2026-05-27-afk-toggle-for-ai-coding-agents %}) I built in May required remembering to type `/afk` before stepping away. Half the time I forgot — I'd just get up, and the agent would sit idle waiting for a prompt that never came. The fix isn't a better reminder, it's removing the step: detect that I've actually left the desk and flip the switch automatically.
 
 ---
