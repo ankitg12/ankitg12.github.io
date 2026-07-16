@@ -64,3 +64,6 @@ I skipped a "does something already do this" check before writing code, and paid
 
 - Shim: `~/.local/bin/wu.cmd` (personal dotfiles, not public)
 - `bash(1)` — `-s` flag: "If there are no operands, `-s` causes bash to read commands from standard input."
+- [Using WSL to Launch Several Bash Commands from an Application](https://weblog.west-wind.com/posts/2020/May/19/Using-WSL-to-Launch-Several-Bash-Commands-from-an-Application) (Rick Strahl) — same underlying problem (getting a real multi-line bash session going from a Windows host app) from a different angle.
+- [`az.cmd` truncates multi-line arguments on Windows](https://github.com/Azure/azure-cli/issues/32644) — the exact same class of bug: a `.cmd` shim silently mangling multi-line payloads passed as command-line args, on a much bigger project.
+- [Bypass npm `.cmd` shim on Windows to preserve multi-line prompts](https://github.com/multica-ai/multica/pull/1718) — another AI-agent tool hitting the identical Windows `.cmd`-shim-eats-newlines failure mode, fixed the same way (stop routing the payload through argv).
