@@ -3,6 +3,7 @@ description: Notes on agentic AI, infrastructure, and engineering.
 baseurl: ""
 url: "https://ankitg12.github.io"
 github_username: ankitg12
+timezone: Asia/Kolkata   # interpret post dates in IST — pre-dawn posts are "future" in UTC otherwise (Jekyll silently drops future-dated posts)
 
 theme: minima
 plugins:
