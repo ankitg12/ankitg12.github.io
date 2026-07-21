@@ -13,6 +13,8 @@ wu 'cd ~/repo && git show SHA:path/file | grep "one|two"'
 
 …and WSL greets you with `rtr: command not found` or `unexpected EOF while looking for matching quote`. The command is fine. The *quoting* died three shells ago.
 
+> An [earlier post]({% post_url 2026-07-16-wu-cmd-wsl-multiline-fix %}) covered the *mechanical* fix for multi-line scripts in this same `wu` wrapper. This one is about the underlying *why* — the layered-quoting model that explains the whole class of failures, and the one principle that dissolves it.
+
 ## Why this breaks
 
 When you invoke a Linux command from a Windows wrapper, the string you typed is re-parsed by **three** different parsers before a single byte reaches your program:
