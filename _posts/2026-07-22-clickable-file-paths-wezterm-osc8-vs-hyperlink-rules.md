@@ -22,7 +22,7 @@ There are exactly two ways a path becomes clickable in a terminal, and they are 
 
 That last row is the whole game. **OSC 8 declares. Regex guesses.**
 
-My coding agent (OMP) uses OSC 8: it knows the exact path it's printing, so it wraps it in an [OSC 8 hyperlink](https://gist.github.com/egmontkob/eb114294efdcd5adb1944c9f3cb5feda) escape sequence before the bytes ever hit the terminal. Node's `url.pathToFileURL(p).href` does the encoding. Raw shell output (`ls`, `git`, `find`, build logs) emits no such thing — a path there is just plain text bytes. For those, the terminal's only route to clickability is `hyperlink_rules`: regexes it runs over the screen to auto-detect links.
+My coding agent (OMP) uses OSC 8: it knows the exact path it's printing, so it wraps it in an [OSC 8 hyperlink](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda) escape sequence before the bytes ever hit the terminal. Node's `url.pathToFileURL(p).href` does the encoding. Raw shell output (`ls`, `git`, `find`, build logs) emits no such thing — a path there is just plain text bytes. For those, the terminal's only route to clickability is `hyperlink_rules`: regexes it runs over the screen to auto-detect links.
 
 WezTerm's default `hyperlink_rules` match URLs (`http`, `mailto`, …) but **never bare file paths**. That's the gap.
 
@@ -134,6 +134,6 @@ If you want OSC 8 for an arbitrary command without writing a wrapper, [`mash/osc
 ## Source
 
 - WezTerm [`hyperlink_rules`](https://wezterm.org/config/lua/config/hyperlink_rules.html) and the [`open-uri` event](https://wezterm.org/config/lua/window-events/open-uri.html)
-- [OSC 8 hyperlink spec](https://gist.github.com/egmontkob/eb114294efdcd5adb1944c9f3cb5feda) (Egmont Koblinger)
+- [OSC 8 hyperlink spec](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda) (Egmont Koblinger)
 - Rust [`regex`](https://docs.rs/regex/) crate — the engine behind both WezTerm and ripgrep
 - [`mash/osc8wrap`](https://github.com/mash/osc8wrap) — OSC 8 pipe filter
