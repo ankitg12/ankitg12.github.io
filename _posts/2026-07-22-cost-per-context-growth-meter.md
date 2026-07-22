@@ -1,6 +1,6 @@
 ---
 layout: post
-title: "The \$/1M-ctx-growth meter: measuring what a coding agent's context is actually costing you"
+title: "The $/1M-ctx-growth meter: measuring what a coding agent's context is actually costing you"
 date: 2026-07-22
 categories: ai agents productivity tools
 series: "AI coding agent productivity"
