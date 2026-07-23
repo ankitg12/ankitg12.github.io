@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "You Can Only Optimize What You Can See: Measuring an Agent's Context Footprint"
-date: 2026-07-23 14:00:00 +0530
+date: 2026-07-23 12:30:00 +0530
 categories: ai agents productivity tools
 series: "AI coding agent productivity"
 ---
