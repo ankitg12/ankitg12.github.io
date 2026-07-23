@@ -70,7 +70,7 @@ Here is the uncomfortable measurement, the one worth publishing precisely becaus
 | warm proxy (reused loopback session) | ~4.8s | **~1.5s** |
 | direct remote (fresh TLS + OAuth + WAN each) | ~4.9s | ~2.7s |
 
-The warm proxy saves about a second per call at steady state. Real, but modest. And it does nothing for the cost that actually dominates a *one-shot CLI invocation*: **importing the MCP client library takes ~10 seconds** before a single byte crosses the network. For "paste a link, read one message," the agent shells out to a fresh Python process each time, the import tax swamps everything, and the daemon barely registers.
+The warm proxy saves about a second per call at steady state. Real, but modest. And it does nothing for the cost that actually dominates a *one-shot CLI invocation*: the **client library itself**. A full one-shot process — with the daemon already warm — runs about **6 seconds**, of which importing the MCP client library is ~1.7s and most of the rest is that library's own client construction, connection, and teardown machinery. The actual loopback work is ~1.2s. For "paste a link, read one message," the agent shells out to a fresh Python process each time, that per-process library overhead swamps everything, and the daemon barely registers. (Note the trap I nearly published: my *first* measurements showed 10–14s, and I almost wrote that up as "the import cost" — but those were cold first-runs, uncompiled bytecode plus a direct wide-area call before the daemon existed. Steady-state is ~6s. Measure warm *and* cold, and don't generalize the cold number.)
 
 So I built the technically-correct fix for the wrong bottleneck. The connection *was* expensive; it just wasn't the *most* expensive thing in the path I most cared about. The warm proxy earns its keep in one clear place: many calls **inside one long-lived process** — a batch export, a search sweeping many windows — where the reused upstream amortizes across dozens of tool calls. If your callers are one-shot processes, profile the whole invocation before you optimize the network, or you'll polish the visible 20% and miss the 80%.
 
@@ -90,7 +90,7 @@ Two things stood out. First, their Docker wrapper is *their* version of my warm 
 - **The reentrant-client singleton is the primitive.** Enter one client once, hold it open, and let a connection-aware proxy factory reuse it. No pool, no locks — if your library already refcounts connections, connect *before* you build the proxy.
 - **"Stateful" is scoped to the caller's session, not global.** Read what the primitive actually keeps warm, and for whom, before trusting the name.
 - **Connection cost and context cost are different problems.** A warm proxy makes the transport cheap; it does not make an MCP server's upfront tool-schema context cheap. If you stripped an MCP to reclaim context, do not re-point the agent at a warm proxy expecting the savings to survive — they won't.
-- **Measure the whole invocation before optimizing one leg of it.** A ~1s network saving is invisible behind a ~10s import. The right fix for the wrong-dominant cost is still the wrong fix.
+- **Measure the whole invocation before optimizing one leg of it.** A ~1s network saving is invisible behind ~5s of client-library import-and-construction overhead. The right fix for the wrong-dominant cost is still the wrong fix — and measure the *warm* path, not just the cold first-run, or you'll misattribute where the time goes.
 
 ## Source
 
