@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "One Browser, Two Identities: Route Links to the Right Edge Profile"
-date: 2026-07-25 21:05:00 +0530
+date: 2026-07-25 20:55:00 +0530
 categories: windows tools productivity
 ---
 
