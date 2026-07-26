@@ -2,6 +2,7 @@
 layout: post
 title: "Stop your agent repeating the same web search"
 date: 2026-07-23
+updated: 2026-07-26
 categories: ai agents productivity
 series: "AI coding agent productivity"
 ---
@@ -53,15 +54,40 @@ It will *miss* a semantic rephrase that shares few words (`SONiC architecture` v
 
 That last point is the real lesson. I *did* start dragging in embeddings and a vector DB, and had to strip it all back out. For a two-thousand-row personal ledger, a distributed vector store is theatre. Boring SQLite plus a conservative string match is the correct amount of engineering — and it's the version that shipped, works, and never blocks a real idea.
 
+## The bug the conservative matcher missed
+
+Three days later, the agent searched for *"human factors progressive disclosure discoverability command palettes"* and presented the same progressive-disclosure articles it had already found for *"feature flags configuration progressive disclosure extension UI"*.
+
+The query gate behaved exactly as designed—and still failed the user. The two normalised signatures shared only `progressive` and `disclosure`; their `SequenceMatcher` ratio was **0.47**, well below the **0.82** threshold. Tightening the wording matcher would recreate the false-positive problem above. More importantly, it would optimize the wrong thing: I cared whether the agent repeated the same **knowledge**, not whether it repeated the same **query**.
+
+The fix adds a second gate after the web search:
+
+1. Extract and canonicalise result URLs, ignoring local proxy links.
+2. Compare the candidate URL set with stored result sets.
+3. Reject the search when at least three sources recur, or when at least two recur and make up at least 35% of the smaller result set.
+
+The repeated search shared IxDF, UX/UI Principles, and Lollypop Design, so it now exits `2` and points to the earlier ledger entry instead of recording another gem:
+
+```text
+DUPLICATE - search results already covered by:
+#1969 feature flags configuration progressive disclosure extension UI [2026-07-25]
+
+Pick a genuinely new/farther-afield topic and search again.
+```
+
+Four regression tests defend the boundary: substantial two-source overlap and any three-source overlap are duplicates; one shared source is not; and a rejected search never inserts another ledger row.
+
+This is a useful distinction for any retrieval system: **deduplicating requests is not the same as deduplicating outcomes**. Query similarity remains the cheap pre-search gate; source overlap is the evidence-based post-search gate. Embeddings are still an available later layer for cases where different sources restate the same knowledge, but they were not required to fix the observed failure.
+
 ## Takeaways
 
 - **Query your agent's own logs** before building; the evidence is already there.
 - **Gate, don't document** — a rejection costs one line; a re-read costs the whole history.
-- **Conservative dedup beats clever dedup** — a false block is worse than an occasional miss.
+- **Conservative dedup needs two levels** — compare the proposed query before searching, then compare the returned evidence before recording it.
 - **Right-size the storage** — SQLite and a string match, not a vector DB, until the data actually demands more.
 
 ## Source
 
-- [`gemsearch.py` (gist)](https://gist.github.com/ankitg12/1c1d19ac81190d2b1d5264fa6b2ca367) — the whole tool, ~300 lines, stdlib only
+- [`gemsearch.py` (gist)](https://gist.github.com/ankitg12/1c1d19ac81190d2b1d5264fa6b2ca367) — original dependency-free implementation; the post-search URL-overlap gate above is the subsequent fix
 - [SimHash / locality-sensitive hashing](https://en.wikipedia.org/wiki/Locality-sensitive_hashing) — the near-duplicate technique for the semantic upgrade
 - [GPTCache](https://github.com/zilliztech/GPTCache) — semantic caching done the heavyweight way, for when you genuinely need it
