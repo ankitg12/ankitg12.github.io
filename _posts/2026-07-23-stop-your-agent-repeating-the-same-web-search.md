@@ -89,6 +89,18 @@ The adjacent research turned up two credible alternatives. Both are good techniq
 | MinHash, usually with LSH | Compact signatures that approximate Jaccard similarity between large sets | Fast candidate retrieval across very large collections | Probabilistic; signature size controls error; still needs meaningful set elements | Premature: exact intersection over roughly 2,000 tiny URL sets is cheaper and has no estimation error |
 | RETSim | Learned character-level embeddings of document text | Robust near-duplicate retrieval across typos, edits, languages, and adversarial perturbations | Requires fetching text, model inference, an index, and calibrated similarity thresholds | Solves a harder problem we have not yet observed: different sources carrying near-duplicate text |
 
+### Jaccard similarity, from first principles
+
+Jaccard similarity answers a simple question: **of all distinct items seen across two sets, what fraction appears in both?** Divide the size of the intersection—the shared items—by the size of the union—all distinct items:
+
+```text
+Jaccard(A, B) = |A ∩ B| / |A ∪ B|
+```
+
+Suppose one search returns `{A, B, C, D, E}` and another returns `{A, B, C, F, G}`. They share three sources; together they contain seven distinct sources. Their Jaccard similarity is `3 / 7 ≈ 0.43`. A score of `0` means no overlap; `1` means the sets are identical.
+
+Our current gate deliberately uses a slightly different measure for the two-source rule: `shared / size of smaller set`, sometimes called the **overlap coefficient** or containment score. If a narrow three-result search repeats two sources from a broad ten-result search, Jaccard is only `2 / 11 ≈ 0.18`, but containment is `2 / 3 ≈ 0.67`—a better signal that most of the narrow search is recycled. The unconditional three-source rule then catches substantial recurrence even when both result lists are long. MinHash naturally estimates Jaccard; reproducing our asymmetric containment policy with sketches would require additional machinery.
+
 MinHash is particularly elegant when exact set comparison becomes the bottleneck. With `k` hash functions it represents each set using a fixed-size signature and estimates Jaccard similarity from signature agreement; the expected error falls as `O(1/√k)`. Combined with locality-sensitive hashing, it can avoid scanning every historical set. But our sets contain only a handful of URLs. Computing their exact intersection preserves the same signal without approximation, tuning, or another dependency.
 
 RETSim addresses a different layer. The published model uses a character-level vectorizer plus a small transformer—536K parameters—to produce 256-dimensional embeddings for robust near-duplicate text retrieval. It substantially outperforms MinHash on the paper's multilingual and adversarially modified text benchmarks. To use it here, however, `gemsearch` would need to download and normalize article bodies, run inference, store embeddings, and decide a threshold. That is defensible only after observing repeats where the URLs differ but the underlying content is genuinely the same.
