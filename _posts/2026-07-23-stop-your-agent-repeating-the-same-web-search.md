@@ -79,6 +79,31 @@ Four regression tests defend the boundary: substantial two-source overlap and an
 
 This is a useful distinction for any retrieval system: **deduplicating requests is not the same as deduplicating outcomes**. Query similarity remains the cheap pre-search gate; source overlap is the evidence-based post-search gate. Embeddings are still an available later layer for cases where different sources restate the same knowledge, but they were not required to fix the observed failure.
 
+## Why not MinHash or RETSim?
+
+The adjacent research turned up two credible alternatives. Both are good techniques; neither matches the failure we actually observed.
+
+| Approach | What it compares | Strength | Cost or blind spot | Fit here |
+|---|---|---|---|---|
+| Exact canonical URL sets (current) | The 5–10 sources returned by each search | Deterministic, lossless, explainable, standard-library only | Misses equivalent knowledge hosted at different URLs | Best fit: the failure repeated three identical sources |
+| MinHash, usually with LSH | Compact signatures that approximate Jaccard similarity between large sets | Fast candidate retrieval across very large collections | Probabilistic; signature size controls error; still needs meaningful set elements | Premature: exact intersection over roughly 2,000 tiny URL sets is cheaper and has no estimation error |
+| RETSim | Learned character-level embeddings of document text | Robust near-duplicate retrieval across typos, edits, languages, and adversarial perturbations | Requires fetching text, model inference, an index, and calibrated similarity thresholds | Solves a harder problem we have not yet observed: different sources carrying near-duplicate text |
+
+MinHash is particularly elegant when exact set comparison becomes the bottleneck. With `k` hash functions it represents each set using a fixed-size signature and estimates Jaccard similarity from signature agreement; the expected error falls as `O(1/√k)`. Combined with locality-sensitive hashing, it can avoid scanning every historical set. But our sets contain only a handful of URLs. Computing their exact intersection preserves the same signal without approximation, tuning, or another dependency.
+
+RETSim addresses a different layer. The published model uses a character-level vectorizer plus a small transformer—536K parameters—to produce 256-dimensional embeddings for robust near-duplicate text retrieval. It substantially outperforms MinHash on the paper's multilingual and adversarially modified text benchmarks. To use it here, however, `gemsearch` would need to download and normalize article bodies, run inference, store embeddings, and decide a threshold. That is defensible only after observing repeats where the URLs differ but the underlying content is genuinely the same.
+
+The decision rule is therefore evidence-led:
+
+```text
+same query wording?       → deterministic pre-search string gate
+same returned sources?    → deterministic post-search URL-set gate
+same content, new URLs?   → add RETSim only after this failure appears
+millions of stored sets?  → consider MinHash + LSH when exact scans become measurable
+```
+
+This is not reluctance to use sophisticated machinery. It is architectural discipline: **choose the cheapest representation that preserves the signal you need, and promote complexity only when measured false negatives demand it.** For an engineer building toward Fellow-level scope, the important skill is not knowing that MinHash and RETSim exist; it is being able to explain precisely why the production boundary does—or does not—justify them.
+
 ## Takeaways
 
 - **Query your agent's own logs** before building; the evidence is already there.
@@ -89,5 +114,6 @@ This is a useful distinction for any retrieval system: **deduplicating requests 
 ## Source
 
 - [`gemsearch.py` (gist)](https://gist.github.com/ankitg12/1c1d19ac81190d2b1d5264fa6b2ca367) — original dependency-free implementation; the post-search URL-overlap gate above is the subsequent fix
-- [SimHash / locality-sensitive hashing](https://en.wikipedia.org/wiki/Locality-sensitive_hashing) — the near-duplicate technique for the semantic upgrade
+- [MinHash](https://en.wikipedia.org/wiki/MinHash) — approximate Jaccard similarity for large-scale set comparison
+- [RETSim: Resilient and Efficient Text Similarity](https://arxiv.org/abs/2311.17264) — lightweight learned embeddings for robust near-duplicate text retrieval
 - [GPTCache](https://github.com/zilliztech/GPTCache) — semantic caching done the heavyweight way, for when you genuinely need it
