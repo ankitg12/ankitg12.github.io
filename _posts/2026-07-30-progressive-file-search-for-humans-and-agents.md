@@ -130,6 +130,7 @@ esq --level 4 todo.md
 
 This is progressive disclosure applied to retrieval: expose complexity only when the previous layer is insufficient.
 
+
 ## Make the safe operation easier
 
 A guardrail that depends on remembering five flags will eventually fail. The safer operation must also be the easier one.
@@ -235,9 +236,26 @@ The non-technical version is one sentence:
 
 The hardest part is explaining why an instant answer can still be expensive. The machine spends almost no time finding the files; the human or agent pays to interpret everything it found.
 
+## Update — one query, a complete index
+
+The first `esq` implementation searched each level-1 root separately. Eight roots meant eight sequential `es.exe` processes, and a representative search took about 14 seconds. The wrapper now sends one OR-grouped path query instead:
+
+```text
+<path:"Documents"|path:"Downloads"|path:"Notes"> regcool
+```
+
+The real paths are absolute and derived at runtime; the abbreviated example shows only the query structure. The same three expected results now return in roughly 4–5 seconds. A raw `es` query took about 2.3 seconds, so replacing this small Python wrapper with another language would not attack the dominant cost. Direct SDK/IPC integration remains possible, but the measured latency does not yet justify that complexity.
+
+The invocation also uses the official ES client's `-argv` mode, which applies Windows `CommandLineToArgvW` parsing so paths containing spaces remain correctly separated arguments.
+
+The other correction was at the indexing layer. Excluding `Program Files`, `AppData`, and `Windows` globally kept results quiet, but it made `esq --level 4` incapable of finding files that never entered Everything's index. Those exclusions were removed. The base index is now complete; levels 1–3 own relevance and noise control at query time, while level 4 remains a genuine raw-index escape hatch.
+
+The refined rule is: **indexing answers what exists; the query layer decides what is useful now.**
+
 ## Source
 
 - [Everything](https://www.voidtools.com/)
+- [Official Everything command-line client source](https://github.com/voidtools/ES)
 - [Everything documentation](https://www.voidtools.com/support/everything/)
 - [Everything 1.5 Result Omissions](https://www.voidtools.com/support/everything/result_omissions/)
 - [Windows Search documentation](https://learn.microsoft.com/en-us/windows/win32/search/windows-search)
