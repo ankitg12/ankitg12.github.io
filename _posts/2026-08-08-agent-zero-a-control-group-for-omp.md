@@ -157,16 +157,14 @@ The useful workflow is simple:
 3. Measure again.
 4. Keep the addition only if its recurring value justifies its recurring context cost.
 
-For example:
+Record each result as a delta from the immediately preceding measurement:
 
 ```text
-Zero baseline                         6,517
-+ project instructions               8,240   (+1,723)
-+ domain skills                     10,910   (+2,670)
-+ coordination tools                14,600   (+3,690)
+marginal cost = tokens after enabling capability
+              - tokens before enabling capability
 ```
 
-The precise numbers will differ by harness version because system prompts and tool schemas evolve. The method remains valid because the control and experiment use the same version.
+System prompts and tool schemas evolve between harness versions, so compare the control and experiment using the same OMP revision. A delta measured across two versions conflates the capability with harness changes.
 
 ## The broader pattern
 
