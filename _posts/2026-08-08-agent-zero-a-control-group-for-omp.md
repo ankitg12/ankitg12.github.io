@@ -221,9 +221,55 @@ This is an important distinction when benchmarking agents: **selecting the right
 
 I filed [OMP issue #8346](https://github.com/can1357/oh-my-pi/issues/8346) to request project/profile settings with semantic parity for rule loading, extension discovery, and tool allowlisting. Until those settings exist, the dedicated launcher remains the reproducible control-group entry point.
 
+## Update: persistence is another independent boundary
+
+I also registered Agent Zero as a managed [Herdr](https://github.com/herdrdev/herdr) agent. This adds a persistent workspace, a stable agent name, focus/navigation commands, and restoration after the terminal host restarts.
+
+It does not replace the isolation contract. The managed launch must still preserve:
+
+- the clean working directory;
+- the isolated OMP state directory;
+- the restricted tool list;
+- disabled extensions, skills, and rules.
+
+A minimal launch has two phases:
+
+```powershell
+$workspace = herdr workspace create `
+    --cwd C:/agent-zero `
+    --label agent-zero `
+    --env HOME=C:/agent-zero `
+    --env USERPROFILE=C:/agent-zero `
+    --env PI_CODING_AGENT_DIR=C:/path/to/.omp/profiles/zero/agent `
+    --no-focus | ConvertFrom-Json
+
+$pane = $workspace.result.root_pane.pane_id
+
+herdr agent start agent-zero `
+    --kind omp `
+    --pane $pane `
+    -- `
+    --no-extensions `
+    --no-skills `
+    --no-rules `
+    --tools read,bash,edit,write,grep,glob,web_search
+```
+
+Use forward slashes in Herdr `--env` values on Windows. Backslashes may be interpreted as escapes before they reach the child process; a malformed state path makes OMP look unauthenticated because it opens a new empty profile.
+
+The launcher should also verify postconditions instead of trusting requested arguments:
+
+1. read the created pane and confirm its working directory;
+2. inspect the child process environment and confirm the state directory;
+3. verify `herdr agent get agent-zero` succeeds after startup;
+4. measure the rendered prompt again and require the same seven tools and approximately 5.6K static tokens.
+
+Herdr persistence and Agent Zero isolation solve different problems. One keeps the process addressable across time; the other keeps the prompt reproducible. A persistent wrong launch is still wrong.
+
 ## Source
 
 - [Oh My Pi](https://github.com/can1357/oh-my-pi) — coding-agent harness and RPC state interface used for the measurement.
 - [Kon](https://github.com/0xku/kon) — minimal, opinionated coding-agent prior art.
 - [mini-coding-agent](https://github.com/rasbt/mini-coding-agent) — readable minimal agent-loop implementation.
 - [Agent Zero](https://github.com/agent0ai/agent-zero) — established autonomous-agent framework with the same name but a different design objective.
+- [Herdr](https://github.com/herdrdev/herdr) — agent-aware terminal multiplexer used to persist and address the isolated OMP process.
