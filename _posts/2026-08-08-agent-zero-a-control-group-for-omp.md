@@ -182,6 +182,45 @@ Agent Zero makes the trade explicit:
 
 The objective is not the smallest possible prompt. It is the smallest prompt that still performs the job—and evidence for every token added beyond it.
 
+## Update: plain `omp` is not yet the control group
+
+I later tried to make the working directory self-activating: enter the Agent Zero directory, run `omp`, and get the same baseline without remembering a launcher command.
+
+OMP can do part of this natively. A project `.env` can select the isolated state directory:
+
+```dotenv
+PI_CODING_AGENT_DIR=C:/path/to/.omp/profiles/zero/agent
+```
+
+Project settings can also remove configured extensions and disable skills:
+
+```yaml
+# .omp/config.yml
+extensions: []
+skills:
+  enabled: false
+```
+
+That makes plain `omp` use the correct authentication, model cache, sessions, and project settings. It does **not** make it equivalent to the control-group launcher.
+
+Measured on the same one-million-token model context:
+
+| Entry point | Tools | Static tokens | Approx. window |
+|---|---:|---:|---:|
+| Plain `omp` with project `.env` and config | 11 | 15,781 | 1.6% |
+| Agent Zero launcher | 7 | 5,630 | 0.6% |
+
+The remaining delta comes from controls that OMP 17.2.15 exposes only as command-line flags:
+
+```text
+--no-rules
+--tools read,bash,edit,write,grep,glob,web_search
+```
+
+This is an important distinction when benchmarking agents: **selecting the right profile proves state isolation; it does not prove prompt equivalence**. Compare rendered state, tool count, and static tokens—not directory names or configuration intent.
+
+I filed [OMP issue #8346](https://github.com/can1357/oh-my-pi/issues/8346) to request project/profile settings with semantic parity for rule loading, extension discovery, and tool allowlisting. Until those settings exist, the dedicated launcher remains the reproducible control-group entry point.
+
 ## Source
 
 - [Oh My Pi](https://github.com/can1357/oh-my-pi) — coding-agent harness and RPC state interface used for the measurement.
