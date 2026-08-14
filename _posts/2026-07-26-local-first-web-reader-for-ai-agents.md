@@ -8,13 +8,13 @@ series: "AI coding agent productivity"
 
 Giving an agent a URL should not force a choice between raw HTML, a heavyweight browser, and sending the page through somebody else's extraction service.
 
-I wanted one agent-facing operation:
+I wanted one bounded operation for web pages:
 
 ```text
 read_url("https://example.com/article") → clean Markdown
 ```
 
-The implementation ended up being a small local MCP server in front of [Defuddle](https://github.com/kepano/defuddle). It keeps extraction local, reuses existing authenticated readers when appropriate, and adds almost nothing to the agent's static context.
+The implementation ended up being a small local MCP server in front of [Defuddle](https://github.com/kepano/defuddle). It keeps extraction local, reuses existing authenticated readers when appropriate, and adds almost nothing to the agent's static context. A thin agent extension intercepts likely HTML reads and directs the agent to this operation while leaving PDFs, spreadsheets, raw data, and local endpoints on the native byte/document reader.
 
 ---
 
@@ -46,13 +46,13 @@ def read_url(url: str, max_chars: int = 100_000) -> str:
     return truncate_locally(content, max_chars)
 ```
 
-Behind that narrow interface is a router:
+Behind that narrow interface is a router for URLs already classified as web pages:
 
 ```text
                          ┌─ configured private host + known URL shape
 read_url(url) ─ validate ┤       → existing authenticated local reader
                          │
-                         └─ every other HTTP(S) URL
+                         └─ ordinary HTML page
                                  → Defuddle CLI → Markdown
 ```
 
@@ -64,6 +64,22 @@ defuddle parse https://example.com/article --markdown --frontmatter
 ```
 
 Defuddle was built for the Obsidian Web Clipper. Compared with a basic readability pass, it aims to preserve structures that matter in technical writing: headings, code blocks, footnotes, math, metadata, and links.
+
+### Select before extracting
+
+Defuddle is an HTML extractor, not a universal URL reader. Sending every `http://` or `https://` target through it fails on PDFs, spreadsheets, raw JSON, and local API endpoints—and can produce confusing secondary errors after the real content-type failure.
+
+The agent integration therefore makes a conservative decision before invoking the MCP tool:
+
+```text
+likely HTML page                         → read_url → Defuddle
+.pdf, .xlsx, .json, raw/API URL          → native read
+localhost, 127.0.0.1, [::1]              → native read
+```
+
+This selector does not transparently call the MCP tool. It blocks the wasteful native HTML read and gives the agent explicit, bounded guidance to invoke `read_url`. URL paths are parsed before matching; bracketed IPv6 hostnames are normalized so `[::1]` does not accidentally enter the HTML path.
+
+The classification is deliberately an optimization, not a security boundary. Content type is authoritative only after fetching, so unfamiliar document endpoints still need graceful fallback rather than an assumption that every extensionless URL is HTML.
 
 ## Why route instead of installing several MCP servers?
 
@@ -174,21 +190,23 @@ The custom part is only the policy router. Content extraction remains somebody e
 
 ## Verification
 
-I exercised four properties rather than merely checking that the server started:
+I exercised the routing boundary rather than merely checking that the server started:
 
 1. **Public extraction** — a technical article became 7,402 characters of Markdown with headings, links, and fenced Lua intact.
-2. **Authenticated routing** — known private URL shapes reached their existing local readers.
-3. **Host isolation** — the same private-looking path on an external hostname stayed on the public route.
-4. **Fresh-session discovery** — a new agent session connected to the MCP server and exposed only `read_url`.
+2. **Native document bypass** — XLSX URLs returned usable sheets and Markdown tables instead of entering Defuddle.
+3. **Raw and local bypass** — raw GitHub data, JSON APIs, `127.0.0.1`, and bracketed `[::1]` stayed on native read.
+4. **Authenticated routing** — known private URL shapes reached their existing local readers.
+5. **Host isolation** — the same private-looking path on an external hostname stayed on the public route.
+6. **Fresh-session discovery** — a new agent session loaded the selector and made the narrow `read_url` MCP operation available for the guided handoff.
 
-That third check is the one most likely to be skipped. It is also the one that turns a convenient router into a defensible security boundary.
+The host-isolation check is the one most likely to be skipped. It is also the one that prevents credentials from crossing the intended trust boundary.
 
 ## The pattern
 
 The reusable pattern is larger than web reading:
 
 ```text
-one agent-facing capability
+one bounded web-page capability
         ↓
 deterministic local router
         ↓
