@@ -78,20 +78,20 @@ The Python handler follows five steps:
 The selection rule deliberately includes idle, working, and done OMP agents. Agent status is not the policy. Focus is.
 
 ```python
-def pause_candidates(agents):
+def omp_candidates(agents, *, include_focused=False):
     return [
         agent
         for agent in agents
         if agent.get("agent") == "omp"
-        and not agent.get("focused", False)
-        and agent.get("pane_id")
+        and agent.get("agent_status") in {"idle", "working", "done"}
+        and (include_focused or not agent.get("focused", False))
     ]
 ```
 
 A pane can contain old `P A U S E D` text in its scrollback, so detecting that heading alone is unsafe. The handler also requires the live pause footer:
 
 ```python
-PAUSE_FOOTER = "esc interrupt"
+PAUSE_FOOTER = "esc · enter · space — resume"
 
 
 def is_paused(herdr, pane_id):
@@ -292,6 +292,43 @@ These evidence layers answer different questions:
 | OMP session log | Did new agent work start after the boundary? |
 
 The remaining observability gap is per-step timing inside the Python handler. Total duration cannot show whether process startup, `agent list`, screen reading, or prompt submission consumed the time.
+
+## Scheduled breaks need ownership, not polling
+
+Focus changes are not the only reason to pause every agent. Windows Task Scheduler
+already owns my Stretchly schedule, including a 35-second mini break every ten
+minutes and a longer break at `:50`. Making every OMP session watch Stretchly would
+duplicate state, create one poller per process, and make resume decisions locally.
+
+Instead, the Scheduler invokes the same Herdr controller directly:
+
+```text
+attention_pause.py break-start --run-id <guid>
+Stretchly renders the break
+attention_pause.py break-end --run-id <guid>
+```
+
+`break-start` captures Herdr's focused pane and sends OMP's native `/pause` to every
+eligible OMP pane, including the focused one. While a break is active, normal
+`pane.focused` and `pane.agent_status_changed` reconciliation cannot exempt an
+agent. Break end clears the hold but resumes nothing; I choose which agent deserves
+attention next.
+
+The controller stores a set of active run IDs rather than one Boolean. That matters
+because the `:50` long-break process can still be sleeping when the `:00` task
+starts. An older invocation may remove only its own token, so it cannot falsely end
+the newer break. An optional flag resumes only the pane captured as last active,
+never every OMP process.
+
+The 20:20 live test produced three independent pieces of evidence: the Scheduler
+logged its unique run ID, the controller's ownership set was empty after the break,
+and Herdr detection screens showed two agents still paused while only the pane I
+selected had resumed. The complete plugin test file also passed all 17 tests,
+including overlap and default no-resume cases.
+
+This path removes event-discovery ambiguity because the component that owns the
+schedule initiates the policy directly. It does not make enforcement real-time:
+in-flight calls still finish, and OMP pauses only at its next safe boundary.
 
 ## What deterministic would require
 
