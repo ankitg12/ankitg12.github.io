@@ -1,24 +1,121 @@
 ---
 layout: post
-title: "Event-Driven Is Not Real-Time"
+title: "Building Attention Pause for Herdr and OMP"
 date: 2026-08-14
 categories: ai agents productivity terminal
 series: "AI coding agent productivity"
 ---
 
-A focus-change hook that pauses the agent I just left sounds deterministic until the hook takes six seconds to decide what “focused” means.
+Two OMP agents were running in separate Herdr panes, but changing focus did not change which agent could continue working.
 
-I wanted a simple safety invariant for several terminal coding agents:
+[Herdr](https://github.com/herdrdev/herdr) is a terminal multiplexer built for coding agents. [Oh My Pi (OMP)](https://github.com/can1357/oh-my-pi) is a terminal coding agent with a native `/pause` command. Together, they expose the pieces for an attention policy:
 
-> Only the agent in the currently focused pane may run. Every other agent remains paused until I resume it manually.
+> Only the OMP agent in the currently focused Herdr pane may run. Every background OMP agent should enter its native pause state and remain there until I resume it manually.
 
-The first implementation was event-driven. A terminal multiplexer emitted focus events, a plugin listed the agents, found the background panes, inspected their screens, and submitted the coding agent's native `/pause` command.
+This post documents the `attention-pause` plugin I built, the real UI tests that broke its early designs, and the difference between a useful best-effort guard and a deterministic focus lock.
 
-Every component worked. The system did not.
+## Why native pause matters
 
-## The first false proof
+The wrong implementation would stop a process, send `Ctrl-C`, or suspend the terminal pane. Those actions can interrupt a write, leave a tool call incomplete, or corrupt conversational state.
 
-Unit tests covered the obvious policy:
+OMP already owns the correct control boundary. Its `/pause` command:
+
+- allows an in-flight tool call to finish;
+- prevents new agent work from starting;
+- displays a native pause overlay;
+- resumes only after manual input.
+
+The plugin therefore does not invent another pause mechanism. It sends the command OMP already understands.
+
+## Herdr's plugin surface
+
+Herdr plugins are TOML manifests that bind commands to lifecycle events. The first manifest subscribed to startup, agent-status changes, and three kinds of focus changes:
+
+```toml
+[plugin]
+name = "Attention Pause"
+plugin_id = "ankit.attention-pause"
+version = "0.1.0"
+platforms = ["windows"]
+
+[[startup]]
+command = ["python", "attention_pause.py"]
+platforms = ["windows"]
+
+[[events]]
+on = "workspace.focused"
+command = ["python", "attention_pause.py"]
+platforms = ["windows"]
+
+[[events]]
+on = "tab.focused"
+command = ["python", "attention_pause.py"]
+platforms = ["windows"]
+
+[[events]]
+on = "pane.focused"
+command = ["python", "attention_pause.py"]
+platforms = ["windows"]
+
+[[events]]
+on = "pane.agent_status_changed"
+command = ["python", "attention_pause.py"]
+platforms = ["windows"]
+```
+
+The hook receives event data through `HERDR_PLUGIN_EVENT_JSON`, then uses Herdr's CLI to inspect and control agents.
+
+## The reconciliation loop
+
+The Python handler follows five steps:
+
+1. list Herdr agents;
+2. select background OMP panes;
+3. read each pane's current detection screen;
+4. skip panes that already show OMP's live pause footer;
+5. recheck focus and submit `/pause`.
+
+The selection rule deliberately includes idle, working, and done OMP agents. Agent status is not the policy. Focus is.
+
+```python
+def pause_candidates(agents):
+    return [
+        agent
+        for agent in agents
+        if agent.get("agent") == "omp"
+        and not agent.get("focused", False)
+        and agent.get("pane_id")
+    ]
+```
+
+A pane can contain old `P A U S E D` text in its scrollback, so detecting that heading alone is unsafe. The handler also requires the live pause footer:
+
+```python
+PAUSE_FOOTER = "esc interrupt"
+
+
+def is_paused(herdr, pane_id):
+    screen = herdr_text(herdr, "agent", "read", pane_id, "--source", "detection")
+    nonempty_lines = [line.strip() for line in screen.splitlines() if line.strip()]
+    return bool(nonempty_lines) and nonempty_lines[-1] == PAUSE_FOOTER
+```
+
+Before submitting the command, the handler reads focus again:
+
+```python
+if is_focused(herdr, pane_id):
+    print(f"now-focused pane={pane_id}")
+    continue
+
+herdr_json(herdr, "agent", "prompt", pane_id, "/pause")
+print(f"pause-sent pane={pane_id}")
+```
+
+That last check closes one time-of-check to time-of-use race: a pane that became focused after the initial snapshot must not be paused.
+
+## Unit tests passed before the interaction did
+
+The test suite covered the policy table:
 
 | Pane state | Focused? | Action |
 |---|---:|---|
@@ -26,157 +123,216 @@ Unit tests covered the obvious policy:
 | working | no | pause |
 | idle | no | pause |
 | already paused | no | skip |
-| not a coding agent | no | skip |
+| non-OMP pane | no | skip |
+| becomes focused after snapshot | yes at recheck | skip |
 
-A scripted focus command also produced the expected plugin log:
+It also covered stale pause text, unknown status values, failed screen reads, lock contention, and a focus event arriving during reconciliation.
+
+The suite passed. Python syntax compilation passed. Herdr reported the plugin as linked and enabled.
+
+Then real switching failed.
+
+## One UI switch emitted three focus hooks
+
+Switching between two Herdr workspaces emitted:
 
 ```text
-pause-sent pane=p1
+workspace.focused
+tab.focused
+pane.focused
 ```
 
-Neither result proved the human interaction. During real UI switching, both agents sometimes continued running. On other attempts, an agent paused tens of seconds later.
-
-The important evidence was not whether `/pause` eventually appeared. It was the timeline:
+Each event launched a separate Python process. Every process then made several command-line round trips back to Herdr:
 
 ```text
-focus event emitted
+focus event
     ↓
-plugin process starts
+start Python
     ↓
-list agents
+herdr agent list
     ↓
-read candidate screen
+herdr agent read <pane>
     ↓
-recheck focus
+herdr agent list          # focus recheck
     ↓
-submit /pause
-    ↓
-agent reaches a safe boundary
-    ↓
-pause overlay appears
+herdr agent prompt <pane> /pause
 ```
 
-“Event-driven” describes how work starts. It says nothing about how long the path takes.
+The event was immediate. The control path was not. Individual handlers took several seconds, which was enough time to switch focus again.
 
-## Three latencies, not one
+This produced three distinct outcomes:
 
-The visible delay contained three different mechanisms.
+```text
+pause-sent pane=w1F:p1
+already-paused pane=w1G:p1
+now-focused pane=w1F:p1
+```
 
-### 1. Event-handler latency
+All three logs are locally correct. Only the first changes agent state. A late `now-focused` result means the policy missed the interval during which that pane was in the background.
 
-Each focus event launched a plugin subprocess. The subprocess then made several command-line round trips back to the terminal multiplexer.
+## The lock detour
 
-A single UI switch emitted workspace, tab, and pane focus events. Subscribing to all three created three concurrent handlers for one human action.
+The first response to duplicate handlers was a non-blocking file lock. One handler reconciled; overlapping handlers returned `coalesced`.
 
-### 2. Reconciliation latency
+That dropped the newest focus change. If an event arrived while reconciliation was active, no final pass was guaranteed.
 
-The handler used a snapshot:
+The next version made waiters acquire the lock eventually. This preserved events but created a stale queue:
+
+```text
+event A ── reconcile old focus
+          event B ── wait ── reconcile older focus
+                    event C ── wait ── reconcile stale focus
+```
+
+The pause sometimes appeared tens of seconds later. That was not OMP waiting for an active tool call. Both agents were idle. The delay came from queued plugin handlers.
+
+This is the important distinction:
+
+| Delay | Meaning |
+|---|---|
+| Handler has not logged `pause-sent` | The plugin has not submitted `/pause` |
+| `pause-sent` logged; tool still finishing | OMP is reaching its safe boundary |
+| Pause appears after several stale handlers | Plugin queue latency, not agent safety latency |
+
+Serial execution can preserve every event and still violate current-state correctness.
+
+## Unique markers and trailing-edge reconciliation
+
+A correct coalescer needs two properties:
+
+1. **single flight** — only one expensive reconciliation runs at a time;
+2. **trailing edge** — an event arriving during that run guarantees one final pass over the newest state.
+
+A single dirty file was insufficient. This sequence loses an event:
+
+```text
+handler A: sees dirty file
+handler B: touches the same existing file
+handler A: deletes file
+```
+
+Handler B's signal disappears with handler A's delete.
+
+Unique marker files avoid that overwrite race. A claimant snapshots and removes only the markers it observed; a marker created during deletion remains for the next waiter.
 
 ```python
-agents = list_agents()
-for agent in agents:
-    if not agent.focused:
-        pause(agent)
+def mark_dirty():
+    marker = tempfile.NamedTemporaryFile(
+        prefix="attention-pause.dirty.",
+        dir=state_dir,
+        delete=False,
+    )
+    marker.close()
+
+
+def claim_dirty():
+    markers = list(state_dir.glob("attention-pause.dirty.*"))
+    for marker in markers:
+        marker.unlink()
+    return bool(markers)
 ```
 
-Focus could change after `list_agents()` but before `pause(agent)`. A just-before-submit recheck prevented pausing the newly focused pane, but it exposed the opposite failure: the pane just left might never be paused.
+This makes event coalescing lossless. It does not make Herdr CLI round trips fast.
 
-This is a time-of-check to time-of-use race. The policy is about *current* focus, while the implementation acts on an aging observation.
+## Reduce amplification first
 
-### 3. Agent safe-boundary latency
+Real logs proved that switching workspaces also emitted `pane.focused`. The plugin therefore removed the broader `workspace.focused` and `tab.focused` subscriptions.
 
-The native `/pause` command does not terminate an in-flight tool call. The current call may finish, after which the agent enters its pause overlay before starting new work.
+The active event surface became:
 
-That delay is intentional. It is different from a plugin that has not submitted `/pause` yet.
+```toml
+[[events]]
+on = "pane.focused"
+command = ["python", "attention_pause.py"]
+platforms = ["windows"]
 
-The logs therefore need to distinguish:
+[[events]]
+on = "pane.agent_status_changed"
+command = ["python", "attention_pause.py"]
+platforms = ["windows"]
+```
+
+`pane.focused` handles human navigation. `pane.agent_status_changed` catches a background agent that becomes active without another focus change.
+
+This reduced one switch from three focus handlers to one. It improved the system, but live tests still showed variable delay. The plugin is therefore useful as a best-effort attention guard, not as a deterministic real-time lock.
+
+## Logs are part of the product
+
+The handler prints one decision for every candidate:
 
 ```text
-handler started
-focus state read
-pause submitted
-pause acknowledged
-pause visible
+pause-sent pane=w1F:p1
+already-paused pane=w1G:p1
+now-focused pane=w1F:p1
+read-failed pane=w1G:p1
+coalesced
 ```
 
-A total handler duration cannot identify which boundary caused the delay.
+Herdr preserves each event's start time, finish time, status, stdout, and stderr:
 
-## Why a lock made it worse
-
-The obvious response to duplicate handlers was a file lock. Only one handler would reconcile; the others would coalesce.
-
-The first version dropped overlapping events. If focus changed while one reconciliation was active, the latest state might never receive a final pass.
-
-The second version made every waiter acquire the lock eventually. That preserved events but converted a burst into a queue:
-
-```text
-event A ── reconcile old state
-          event B ── wait ── reconcile older state
-                    event C ── wait ── reconcile stale state
+```powershell
+herdr plugin log list --plugin ankit.attention-pause --limit 60
 ```
 
-Correct serialization is not the same as current-state correctness. A safety action performed reliably on stale state is still wrong.
+Two more commands ground the UI state:
 
-A better coalescing primitive needs both properties:
-
-1. **single flight** — at most one expensive reconciliation runs at a time;
-2. **trailing edge** — if an event arrives during that run, exactly one final reconciliation uses the newest state.
-
-Even that does not solve a six-second control path. Debouncing duplicate work cannot turn slow observation into real-time enforcement.
-
-## One switch should produce one hook
-
-The first useful simplification was to remove redundant focus subscriptions. Real logs showed that a workspace switch also emitted `pane.focused`, so the plugin retained only the narrow event needed by the policy.
-
-This reduced amplification:
-
-```text
-before: workspace.focused + tab.focused + pane.focused
- after: pane.focused
+```powershell
+herdr agent list
+herdr agent read w1F:p1 --source detection
 ```
 
-It did not make the remaining command-line round trips instantaneous. Reducing the number of slow paths is not the same as building a fast path.
+These evidence layers answer different questions:
 
-## The design rule
-
-A real-time safety invariant cannot depend on a slow asynchronous observer.
-
-If pausing must follow focus immediately, the control should live as close as possible to the focus transition:
-
-```text
-focus owner
-    ├── changes focused pane
-    └── applies pause policy from the same authoritative state
-```
-
-If the plugin contract cannot support that atomicity, the honest options are:
-
-| Mode | Claim |
+| Evidence | Question answered |
 |---|---|
-| Integrated control path | Deterministic focus safety |
-| Asynchronous best effort | Background agents will usually pause later |
-| Disabled | No automated protection |
+| Plugin event log | Did Herdr invoke the hook? |
+| Handler stdout | Why did reconciliation pause or skip? |
+| Agent list | Which pane is focused now? |
+| Detection screen | Is OMP's native pause overlay visible? |
+| OMP session log | Did new agent work start after the boundary? |
 
-The interface must name its guarantee correctly. A delayed best-effort mechanism may still be useful, but it must not be presented as a lock.
+The remaining observability gap is per-step timing inside the Python handler. Total duration cannot show whether process startup, `agent list`, screen reading, or prompt submission consumed the time.
 
-## Verification gates
+## What deterministic would require
 
-A useful test plan must cross the process and UI boundaries:
+A real-time focus invariant should live near the authoritative focus transition:
 
-1. Start with two unpaused agents.
-2. Switch through the real UI, not a surrogate focus command.
-3. Record the focus-event timestamp.
-4. Record each state-read and command-submission timestamp.
-5. Confirm the pane just left receives `/pause`.
-6. Return to that pane and confirm the native pause overlay is still present.
-7. Resume it manually.
-8. Repeat rapidly enough to overlap handlers.
-9. Test while one agent has an in-flight tool call.
-10. Fail the test if either agent starts new work after its safe boundary.
+```text
+Herdr changes focused pane
+    ├── records the new focus owner
+    └── applies the background pause policy
+```
 
-Unit tests remain valuable. They prove selection rules and race guards. They do not prove that event dispatch, subprocess startup, command transport, terminal state, and agent control compose within the required time.
+An asynchronous plugin can observe the transition later. It cannot make its observation atomic with the transition.
 
-The general lesson extends beyond coding agents: **an event is notification that reality changed, not a transaction that changed reality safely.**
+The honest guarantee table is:
+
+| Architecture | Claim |
+|---|---|
+| Focus owner applies policy in-process | Deterministic focus safety |
+| Event plugin with asynchronous CLI calls | Best-effort delayed pause |
+| Plugin disabled | No automated protection |
+
+The next useful investigation is not another lock variant. It is whether the Herdr event payload and plugin API can remove the slow CLI discovery calls, or whether the pause policy belongs inside Herdr itself.
+
+## Verification checklist
+
+A final test must use the real Herdr UI:
+
+1. Start two unpaused OMP agents.
+2. Switch from agent A to agent B.
+3. Record the `pane.focused` event time.
+4. Confirm A receives `/pause`.
+5. Return to A and confirm its native pause overlay remains visible.
+6. Resume A manually.
+7. Repeat rapidly enough to overlap handlers.
+8. Repeat while one OMP tool call is in flight.
+9. Correlate focus, submission, overlay, and session-log timestamps.
+10. Reject a deterministic claim if either agent starts new work after its safe boundary.
+
+Unit tests prove selection rules. Only this end-to-end test proves that Herdr events, subprocess startup, CLI transport, terminal state detection, and OMP control compose into the intended attention boundary.
+
+The larger lesson is simple: **Herdr can tell a plugin that focus changed, and OMP can pause safely, but the latency between those facts determines the guarantee.**
 
 ## Source
 
