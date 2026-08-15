@@ -25,7 +25,7 @@ OMP already owns the correct control boundary. Its `/pause` command:
 - displays a native pause overlay;
 - resumes only after manual input.
 
-The plugin therefore does not invent another pause mechanism. It sends the command OMP already understands.
+The first version therefore did not invent another pause mechanism. It submitted the command OMP already understood. A live drafting failure the next morning proved that the transport was wrong; the [August 15 update](#update-the-prompt-editor-is-not-a-control-plane) below replaces it with an out-of-band key action while retaining OMP's process-wide pause gate.
 
 ## Herdr's plugin surface
 
@@ -308,11 +308,12 @@ Stretchly renders the break
 attention_pause.py break-end --run-id <guid>
 ```
 
-`break-start` captures Herdr's focused pane and sends OMP's native `/pause` to every
-eligible OMP pane, including the focused one. While a break is active, normal
-`pane.focused` and `pane.agent_status_changed` reconciliation cannot exempt an
-agent. Break end clears the hold but resumes nothing; I choose which agent deserves
-attention next.
+`break-start` captures Herdr's focused pane and requests OMP's native pause for every
+eligible OMP pane, including the focused one. The first implementation submitted
+`/pause` as a prompt; the August 15 repair routes the request through a dedicated
+control key instead. While a break is active, normal `pane.focused` reconciliation
+cannot exempt an agent. Break end clears the hold but resumes nothing; I choose
+which agent deserves attention next.
 
 The controller stores a set of active run IDs rather than one Boolean. That matters
 because the `:50` long-break process can still be sleeping when the `:00` task
@@ -329,6 +330,73 @@ including overlap and default no-resume cases.
 This path removes event-discovery ambiguity because the component that owns the
 schedule initiates the policy directly. It does not make enforcement real-time:
 in-flight calls still finish, and OMP pauses only at its next safe boundary.
+
+## Update: the prompt editor is not a control plane
+
+On August 15, a real interaction exposed a more serious defect than latency. I was
+writing a prompt when focus changed. The plugin ran this line:
+
+```python
+herdr_json(herdr, "agent", "prompt", pane_id, "/pause")
+```
+
+Herdr's `agent prompt` operation submits text through OMP's editor. The editor was
+already holding my draft, so `/pause` joined user text instead of remaining a local
+command. The plugin had treated a shared data channel as a control channel.
+
+Clearing the editor first would merely exchange prompt corruption for prompt loss.
+Capturing, clearing, submitting, and restoring the draft would still race with the
+user's keyboard. The repair therefore had one non-negotiable property: **pause must
+not write text into the editor at all**.
+
+OMP's RPC mode was not an escape hatch. `omp --mode rpc` creates a separate process
+that reads JSON commands from its own standard input; it does not attach to an
+already-running interactive TUI, and its command union has no process-global pause
+operation.
+
+OMP extensions already provide the needed control surface: a keyboard shortcut can
+run code without entering editor text. A small extension binds `Ctrl+Alt+P` directly
+to OMP's existing process-wide `agentPauseGate`. The Python controller now sends
+that logical key through Herdr:
+
+```python
+PAUSE_SHORTCUT = "ctrl+alt+p"
+
+
+def request_pause(herdr, pane_id):
+    herdr_json(herdr, "agent", "send-keys", pane_id, PAUSE_SHORTCUT)
+```
+
+The extension engages the same pause gate used by native `/pause`, presents a pause
+overlay, and resumes on Escape, Enter, Space, or `Ctrl-C`. Main-agent, subagent, and
+advisor semantics therefore remain process-wide; only the transport changed.
+
+The live regression test used a fresh OMP process in a disposable Herdr pane:
+
+1. Type `DRAFT-SENTINEL-7f31 keep this exact` without pressing Enter.
+2. Send `Ctrl+Alt+P` through `herdr agent send-keys`.
+3. Confirm that the pause overlay appears.
+4. Resume with Space.
+5. Read the editor again and compare the draft byte for byte.
+
+The draft remained exact, and no `/pause` text appeared in it.
+
+This repair also found a detection edge case. OMP's wide pause screen ends with
+`esc · enter · space — resume`, while a narrow or short pane ends with
+`esc to resume`. Detection now requires the common `P A U S E D` title within the
+final five non-empty lines *and* one of those exact final footers. A realistic wide
+fixture matters: its two body lines and clock place the title fifth from last, so a
+four-line tail check silently misses the native screen.
+
+The resulting test suite passes 18 tests, including compact and full native layouts,
+stale scrollback text, focus races, overlapping scheduled breaks, and the out-of-band
+`send-keys` request. The current plugin subscribes only to `pane.focused`; removing
+`pane.agent_status_changed` avoids a feedback loop in which pause-induced state
+changes start more reconciliation handlers.
+
+The revised lesson is stronger than "use the native pause mechanism": **use the
+native state transition through a control channel that cannot collide with user
+data.**
 
 ## What deterministic would require
 
@@ -357,14 +425,14 @@ The next useful investigation is not another lock variant. It is whether the Her
 A final test must use the real Herdr UI:
 
 1. Start two unpaused OMP agents.
-2. Switch from agent A to agent B.
-3. Record the `pane.focused` event time.
-4. Confirm A receives `/pause`.
-5. Return to A and confirm its native pause overlay remains visible.
-6. Resume A manually.
+2. Leave an identifiable unsent draft in agent A.
+3. Switch from agent A to agent B.
+4. Record the `pane.focused` event time.
+5. Confirm A receives the out-of-band control key and shows its pause overlay.
+6. Return to A, resume it manually, and confirm the draft is byte-identical.
 7. Repeat rapidly enough to overlap handlers.
 8. Repeat while one OMP tool call is in flight.
-9. Correlate focus, submission, overlay, and session-log timestamps.
+9. Correlate focus, key dispatch, overlay, and session-log timestamps.
 10. Reject a deterministic claim if either agent starts new work after its safe boundary.
 
 Unit tests prove selection rules. Only this end-to-end test proves that Herdr events, subprocess startup, CLI transport, terminal state detection, and OMP control compose into the intended attention boundary.
