@@ -444,3 +444,109 @@ The larger lesson is simple: **Herdr can tell a plugin that focus changed, and O
 - [Herdr — runtime for coding agents](https://github.com/herdrdev/herdr)
 - [Oh My Pi — terminal coding agent](https://github.com/can1357/oh-my-pi)
 - [Ambient Attention Without Interruption]({% post_url 2026-08-11-ambient-attention-without-interruption %})
+
+## August 18 update: a keypress is not a durable pause request
+
+The August 15 repair removed prompt corruption, but it still treated one successful
+`send-keys` call as successful pause delivery. That assumption failed during a
+scheduled break. Most OMP sessions paused; one busy session did not.
+
+Tracing OMP's input controller exposed the missing distinction. Herdr can write F12
+to a pane's PTY, and the PTY may buffer it briefly, but OMP has no durable
+"pause pending" queue. Extension shortcuts are registered on the main editor. If a
+dialog or another component owns input, the key can be routed there and consumed.
+Transport success therefore proves neither shortcut dispatch nor pause acceptance.
+
+The first repair used a small filesystem mailbox per pane. Before sending F12, the
+Python controller atomically wrote the active break run IDs and deadlines to a
+deterministic pending file. The OMP extension checked that mailbox on F12, at
+`agent_end`, and every two seconds. It atomically renamed a valid pending file to a
+claim.
+
+The 21:30 scheduled break exposed a subtler bug: this session logged `pause-sent` and
+produced an acknowledgement, yet continued working. The extension had acknowledged
+the claim before `runPauseScreen()` proved that the process-wide agent gate and the
+fullscreen overlay had engaged. The acknowledgement meant "mailbox consumed," not
+"agent paused."
+
+The corrected extension owns the engagement sequence directly. It pauses the
+process-global gate, creates and focuses the native `PauseScreenComponent`, and only
+then renames the claim to an acknowledgement. If another modal owns the TUI, the
+gate is already unavailable, or overlay creation fails, it restores the claim to the
+pending path. The two-second poll then retries while the deadline remains valid.
+
+```text
+pending.<pane>.json
+        │ atomic claim
+        ▼
+pending.<pane>.json.<pid>.<uuid>.claim
+        │ gate engaged + overlay created + focused
+        ▼
+ack.<pane>.json
+
+        failure before confirmation
+claim ───────────────────────────────► pending (retry)
+```
+
+Globbing is used only for cleanup and discovery at break end; it is not the
+synchronization primitive. Direct reads and same-directory atomic renames own the
+claim transition. Break end removes its run from both pending and in-flight claim
+records, so a dialog queued behind another UI cannot produce a late pause after the
+break has ended. Overlapping breaks remain independent: ending one run preserves any
+other live run in the same pane record.
+
+The event-origin policy also became explicit. Herdr exposes the triggering pane as
+`HERDR_PANE_ID`. Creating a new OMP session pauses every other eligible OMP session,
+not the newly created session itself. The extension likewise discards an inherited
+mailbox on a genuinely new session before starting its poller.
+
+## August 18 update: Stretchly Skip must end controller ownership
+
+The original fixed-break task treated elapsed time as the only end signal:
+
+```text
+break-start → launch Stretchly → sleep 35s or 605s → break-end
+```
+
+That was wrong when I clicked Stretchly's **Skip** button. Stretchly ended its UI,
+but the attention controller retained the active long-break run until the sleep
+expired. Restarting OMP during that interval correctly loaded the mailbox poller and
+immediately paused again because the controller still believed the break was active.
+
+The scheduled orchestration now lives in a Python driver instead of PowerShell.
+Before launching the break it records the current byte offset of Stretchly's log.
+It accepts a finish only after observing, in order and after that offset, this run's
+matching pair:
+
+```text
+Stretchly: starting Mini break
+Stretchly: finishing Mini break
+```
+
+The same state machine handles `Long` breaks and markers split across log reads.
+Clicking Skip emits the normal `finishing ... break` line, so the driver calls
+`break-end` immediately. The configured duration remains a fallback deadline. A
+five-line PowerShell compatibility launcher remains only because the existing Task
+Scheduler action cannot be changed without elevation; all policy and lifecycle code
+now runs in Python.
+
+The 21:10 live run provided end-to-end evidence:
+
+- Task Scheduler launched the compatibility wrapper and Python driver;
+- the controller created one active run and per-pane pending records;
+- this OMP session entered its native pause screen;
+- Stretchly logged Mini-break start at 21:10:13 and finish at 21:10:43;
+- the driver cleared the ownership set and all pending records;
+- Task Scheduler returned result `0`.
+
+The full controller/driver suite passes 39 tests and the extension bundles
+successfully against OMP. A fresh disposable OMP pane then received a scheduled
+mailbox record, displayed the native `P A U S E D` overlay, and produced its ACK only
+after the overlay was visible. The ordinary scheduled lifecycle and the corrected
+acceptance boundary are therefore both verified live. The remaining
+operational check is a deliberate live Skip during a future break; its ordered log
+state machine is covered by unit tests but has not yet been exercised manually end to
+end.
+
+The updated lesson is: **a control key is still only a transport event. Reliable
+attention control needs durable intent, explicit acceptance, expiry, and cancellation.**
