@@ -39,7 +39,7 @@ We didn't realize this immediately. At first, we assumed the OMP platform or the
 
 The OMP maintainer, `roboomp`, quickly set us straight. 
 
-First, they clarified that the platform's internal signature stripping only applied to native Google routes, not the OpenAI-compatible gateway route we were using. Our extension *was* necessary, but our implementation was flawed.
+They clarified that OMP's internal stripping works correctly, but we were using an OpenAI-compatible gateway route. Our extension *was* necessary for our specific routing, but our implementation was flawed.
 
 More importantly, `roboomp` gave us a massive architectural hint. We were hooking into the serialization layer (`before_provider_request`), trying to guess which turns were foreign by checking if their tool calls lacked a specific `||thought_signature||` marker. 
 
@@ -50,24 +50,24 @@ Instead, `roboomp` suggested we move our intercept hook earlier in the framework
 | Approach | Where it hooks | How it detects foreign turns | Failure Mode |
 |---|---|---|---|
 | **Wire Format (Old)** | Network Serialization (`before_provider_request`) | Guesses based on *missing* proprietary signature markers in tool call IDs. | If the gateway changes ID formats, native calls are mistakenly flattened. |
-| **Native Provenance (New)** | Framework Context (`context`) | Explicit comparison of `message.model` vs current active model. | Safely isolates foreign turns with 100% accuracy before serialization. |
+| **Native Provenance (New)** | Framework Context (`context`) | Explicit comparison of `message.model` vs current active model. | Safely isolates foreign turns before serialization. |
 
 Provenance is factual, whereas wire-format sniffing is a guess.
 
-### The Fix: Third-Person Records at the Context Layer
+### The Fix: Dropping the Assistant's Call Entirely
 
 Armed with this advice, we refactored our extension. We moved the detection logic to the `context` hook, explicitly comparing `message.model` to the current active model.
 
 Then, we fixed the format contamination itself. The solution isn't to stop flattening history—foreign signatures genuinely cannot be manufactured. The fix is to stop rendering those flattened calls in the assistant's own voice.
 
-If a tool call must be flattened into history, it should be rendered as an inert, third-person record (e.g., inside a `user` or `system` role) that carries the facts without modeling an action the assistant itself performs. 
+In fact, the safest approach is to drop the rendering of the *call* completely, and only keep the result.
 
 ```typescript
 // GOOD: Dropping the imitable call syntax entirely, retaining only the result context in a non-assistant role
 userParts.push(`[Result of prior ${name} execution: ${result}]`);
 ```
 
-By removing the `[called ...]` template from the assistant's history, the model no longer has a bad example to follow, and native tool-calling reliability returns immediately.
+By completely removing the `[called ...]` template from the assistant's history, the model no longer has a bad example to follow, and native tool-calling reliability returns immediately. The context of what happened is preserved purely by the result record.
 
 ### Source
 * Testing and discovery performed against Oh-My-Pi (OMP) `v17.3.8`.
