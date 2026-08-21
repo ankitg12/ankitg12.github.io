@@ -19,6 +19,8 @@ The agent had just sent two tool calls and two tool results. Two equals two. The
 
 Today it works. The fix is about thirty lines of extension code, and none of the thirty lines are the interesting part. The interesting part is why four earlier, more reasonable-looking approaches all failed.
 
+*Update, same afternoon:* this post has a [postscript](#postscript-four-hours-later-the-same-error-a-different-bug). The fix below is correct for parallel calls inside one model's own history, but it does not cover a transcript authored by a *different* model — a case that produces the identical error message for an entirely different reason.
+
 ---
 
 ## The shape of the problem
@@ -244,3 +246,80 @@ The real constraint was structural, and one sentence long: **a signature belongs
 Two months, and the working diff is smaller than the config file of my first attempt. That ratio is not unusual for protocol bugs. The time goes into building an accurate mental model of a system you cannot see, using error messages written from the far side of a translation layer.
 
 Then you delete the proxy, the callback, the fork, and the four clever workarounds, and you write the thirty lines that were always the answer.
+
+---
+
+## Postscript, four hours later: the same error, a different bug
+
+I published the above at lunchtime. By early afternoon the identical error was back:
+
+```text
+Please ensure that the number of function response parts is equal to the
+number of function call parts of the function call turn.
+```
+
+This time it fired on a *model switch*. My agent has a "pre-walk" feature: plan with a strong model, then hand the transcript to a cheaper one to execute. I had pointed the target at Gemini. The switch died instantly, every time.
+
+I had just written 246 lines explaining this error. So I assumed I knew the cause, applied the collapse fix from above to the newly-unsigned turns, and watched it fail three times in a row. **Everything in the section above is correct for parallel calls within one model's own history, and irrelevant here.**
+
+### Asking the far side directly
+
+The thing I finally did — and should have done first — was stop reading my agent's relayed error and replay the captured request straight at the gateway myself. Sixty lines of Python, one POST. The gateway said something my agent had never shown me:
+
+```text
+400 Function call is missing a thought_signature in functionCall parts.
+    This is required for tools to work correctly.
+    ... function call `default_api:read`, position 20.
+```
+
+Different error. The parts-count message my client displayed was a *downstream symptom*; the upstream complaint was missing provenance. Two months of debugging the wrong sentence, and the right one was always one HTTP request away.
+
+### Why every previous fix was irrelevant here
+
+A pre-walk hands Gemini a transcript authored entirely by a **different model**. Not one signature is missing — *all* of them are. There was never a signed sibling call to collapse toward, so "keep the signed call, merge the rest into it" has no anchor to work from.
+
+The signature-replay proxy from Attempt 2 cannot help either, and I proved it rather than assumed it: same request, same 400, whether sent direct or through the proxy. A cache that restores signatures it has previously observed has nothing to restore when no signature ever existed.
+
+So the collapse fix was not merely insufficient. It was answering a question nobody had asked.
+
+### The fix: stop calling it a function call
+
+If Gemini rejects unsigned `functionCall` parts, then foreign tool history must not be presented as function calls at all. The call becomes assistant narration; its result becomes a user message:
+
+```text
+assistant:  [called read({"path":"a"})]
+user:       [result of read]
+            contents of a
+```
+
+Every fact survives. Nothing claims to be protocol. And because turns carrying at least one genuine signature are returned untouched, the collapse behaviour described earlier in this post — and the model's own tool calling — are completely unaffected.
+
+The rule is one line: **a turn with no signature was not authored by this model, so do not pretend it was.**
+
+### Verification
+
+I replayed all three captured failures through the real extension hook, then on to the live gateway:
+
+| captured failure | tool-role messages | unsigned calls remaining | gateway |
+|---|---|---|---|
+| capture 1 | 14 -> 0 | 0 | **200** |
+| capture 2 | 13 -> 0 | 0 | **200** |
+| capture 3 | 8 -> 0 | 0 | **200** |
+
+Plus a unit test asserting a signed Gemini turn comes back byte-identical, because the fix is worthless if it disturbs the path that already works. The replay harness is committed; this class of bug is now reproducible offline, without an agent session, in about a second.
+
+The next fresh session switched models cleanly on the first attempt.
+
+### What this actually generalises to
+
+The morning's bug was Gemini-specific. This one is not.
+
+Any time a transcript authored by model A is handed to model B, and B's provider requires per-call provenance, this breaks — model switching, handoffs, session resumption, multi-model routing. Gemini's thought signature is simply the first widely-deployed instance of that requirement. The next provider to add one will break the same features in the same way.
+
+My extension infers foreignness from the *absence* of a signature marker, which is a proxy for the fact I actually want. The durable fix is for agent frameworks to record which model authored each turn and to preserve that provenance through serialization, so foreign turns can be degraded to narrative deliberately rather than discovered by rejection. OpenAI-style message schemas carry no such field today, which is precisely the gap worth filing.
+
+### The lesson that cost the most
+
+I published a post about believing an error message, and then spent four hours believing the same error message again — in a case where it was actively misleading.
+
+The correction is cheap, and I will be doing it first from now on: **when a client relays a provider's error, go and ask the provider yourself.** One raw request. The gateway had a clearer, truer answer than anything in my logs, and it had been willing to give it to me at any point in those two months.
