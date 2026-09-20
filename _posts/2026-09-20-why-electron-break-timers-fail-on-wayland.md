@@ -3,7 +3,7 @@ layout: post
 title: "Why Electron Break Timers Fail on Wayland (and How Native GTK Fixes It)"
 date: 2026-09-20 16:35:00 +0530
 categories: linux wayland productivity
-series: "AI coding agent productivity"
+series: "Moving to Linux"
 ---
 
 After migrating my primary developer workstation from Windows to Linux, I ran into an unexpected breakdown in my deep-work discipline: during scheduled breaks, I could keep typing.

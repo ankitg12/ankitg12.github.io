@@ -3,6 +3,7 @@ layout: post
 title: "Porting AutoHotkey to Wayland: The Mechanics of Turning a Volume Knob into a Scroll Wheel"
 date: 2026-09-18
 categories: linux wayland productivity
+series: "Moving to Linux"
 ---
 
 I recently moved my primary workstation from Windows to Linux. Within an hour, I hit a physical workflow friction I couldn't live without: my keyboard's volume knob no longer scrolled.
