@@ -138,27 +138,53 @@ for mon_idx in range(display.get_n_monitors()):
 
 Because video sync never drops, the external display never negotiates a disconnect. Window layouts remain completely static.
 
-### 2. Complete Input Isolation
+### 2. The Wayland Input Isolation Odyssey: What Failed vs. What Worked
 
-To ensure that neither typing nor window switching can leak into background tools:
+Ensuring that no keystrokes or window-switching chords can leak into background editors on Wayland turned out to be an instructive engineering journey. Unlike Win32, where global keyboard hooks (`WH_KEYBOARD_LL`) and `HWND_TOPMOST` give clients absolute control, Wayland's security architecture is explicitly designed so that client applications cannot trap the user.
 
-```python
-# Swallow every keystroke
-def on_key_press(self, win, event):
-    elapsed = time.time() - self.start_time
-    # During long breaks, allow voluntary exit only after strict interval
-    if self.break_type == "long" and elapsed >= self.strict_interval:
-        if event.keyval in (Gdk.KEY_Escape, Gdk.KEY_Return, Gdk.KEY_space):
-            self.finish_break(early=True)
-            return True
-    # Return True to consume event and prevent background propagation
-    return True
+Here is the empirical record of what failed and what actually worked:
 
-# Re-assert focus immediately if compositor attempts to switch focus
-def on_focus_out(self, win, event):
-    GLib.idle_add(win.present)
-    return False
-```
+#### The Failures (and Why They Failed)
+
+1. **`win.set_modal(True)`**:
+   - *Attempt*: Mark overlay surfaces as modal dialogs to command all events.
+   - *Outcome*: In Mutter, setting modal on multiple toplevel surfaces degraded the primary monitor window from `GDK_WINDOW_STATE_FULLSCREEN` into a centered dialog box, breaking fullscreen coverage on Monitor 0.
+
+2. **`gdk_seat_grab(seat, Gdk.SeatCapabilities.ALL)`**:
+   - *Attempt*: Grab the hardware seat to route all keyboard and pointer input exclusively to the overlay.
+   - *Outcome*: Wayland seat grabs only apply to client-side event dispatching. The compositor (Mutter) intercepts global compositor shortcuts (`Alt+Tab`, `Super`) *before* client event delivery, rendering the seat grab powerless against compositor-level switching.
+
+3. **`zwp_keyboard_shortcuts_inhibit_v1` (GTK4)**:
+   - *Attempt*: Use the official Wayland protocol designed for virtual machine viewers (Spice/Remmina) to inhibit compositor shortcuts.
+   - *Outcome*: GNOME Shell enforces an interactive security dialog on every invocation: *"Allow inhibiting shortcuts... You can restore shortcuts by pressing &lt;Super&gt;Escape"*. If unhandled or timed out, GNOME Shell flags the application as unresponsive and triggers a system *"App not responding"* freeze dialog. A break timer firing every 10 minutes cannot impose interactive permission prompts.
+
+4. **Multi-Window `on_focus_out -> win.present()` Feedback Loop**:
+   - *Attempt*: Call `win.present()` whenever `focus-out-event` fires.
+   - *Outcome*: In a dual-monitor setup with two distinct windows, the display server allows only one surface to hold input focus. When Window 0 gained focus, Window 1 emitted `focus-out` and called `present()`. That stole focus from Window 0, which emitted `focus-out` and called `present()`. This triggered an infinite 4,800 events/second CPU ping-pong loop between the monitors, saturating the event loop.
+
+5. **The Mystery `Gdk-CRITICAL` Assertion**:
+   - *Symptom*: Windows emitted `assertion 'GDK_IS_WAYLAND_WINDOW (window)' failed` on realization.
+   - *Root Cause*: A GDB backtrace under `G_DEBUG=fatal-criticals` proved the caller was not GTK, but Ubuntu's legacy `libappmenu-gtk-module.so` injected via `GTK_MODULES` (written for Unity top-bar menus in 2011). It hooked window realization on surfaces that had no menu bars.
+   - *Fix*: Stripping `appmenu` from `os.environ["GTK_MODULES"]` before GTK initialization eliminated the assertion at the root cause without hacky log filters.
+
+#### The Solutions That Worked
+
+1. **In-Process GSettings Switcher Suspension**:
+   Instead of trying to override the compositor from the bottom up, `xdg-pause` temporarily suspends GNOME Shell's switcher keybindings (`switch-windows`, `switch-applications`, `switch-group`, `switch-panels`) via in-process `Gio.Settings` in &lt;1ms on break start:
+   ```python
+   def suspend_gnome_switchers(self):
+       self.wm_settings = Gio.Settings.new("org.gnome.desktop.wm.keybindings")
+       for key in SUSPEND_KEYBINDINGS:
+           self.saved_keybindings[key] = self.wm_settings.get_strv(key)
+           self.wm_settings.set_strv(key, [])
+   ```
+   Because the keybindings are emptied in GSettings, Mutter does not intercept `Alt+Tab` or `Super+Tab`. Keystrokes fall directly into the overlay surface, where `on_key_press` swallows them. On exit (guaranteed via `atexit` and `signal` handlers), the original keybindings are restored.
+
+2. **Real-Time D-Bus Overview Suppression**:
+   Tapping `Super` alone toggles the GNOME Shell Activities Overview (`OverviewActive`). `xdg-pause` subscribes to `org.gnome.Shell`'s `PropertiesChanged` signal and checks a 100ms polling guard. The moment `OverviewActive` becomes `true`, it issues an instantaneous D-Bus `Set` call returning `OverviewActive` to `false` and re-asserts the overlay.
+
+3. **Top-Right Live Clock Overlay**:
+   A break overlay should orient the user in time. Using `Gtk.Overlay`, `xdg-pause` positions an unobtrusive date and live digital clock in the top-right corner of each display, styled with subtle contrast (`#777777` on `#000000`).
 
 ### 3. Decoupled Localization via `LocaleAdapter`
 
