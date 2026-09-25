@@ -3,6 +3,7 @@ layout: post
 title: "Fixed-time breaks with Stretchly on Windows"
 date: 2026-04-14
 categories: windows productivity
+series: "Personal Productivity"
 ---
 
 [Stretchly](https://hovancik.net/stretchly/) counts down from the moment it starts. If you launch it at 9:03, your breaks land at 9:13, 9:23, 9:33. Share a calendar with anyone and those times mean nothing. A break at 9:00, 9:10, 9:20 — on the clock — is a different thing.

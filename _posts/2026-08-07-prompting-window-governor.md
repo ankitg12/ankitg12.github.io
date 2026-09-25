@@ -3,6 +3,7 @@ layout: post
 title: "Zen at Window 13: A Prompting Governor for Windows"
 date: 2026-08-07
 categories: windows tools productivity
+series: "Personal Productivity"
 ---
 
 Windows will arrange windows, switch between them, and throttle the processes behind them—but it will not tell you that opening window 13 should require closing one of the previous 12.
