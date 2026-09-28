@@ -14,6 +14,8 @@ On Linux GNOME Wayland, the break triggered, the visual overlay appeared, and ye
 
 This post documents why Electron break overlays fail on Wayland, why the naive workaround—hardware display power management (DPMS)—wrecks multi-monitor workspace topologies, and how a 250-line native GTK3 tool ([`xdg-pause`](https://github.com/ankitg12/xdg-pause)) cleanly solves the problem.
 
+> **Update (2026-09-28):** The native GTK3 approach also broke on Wayland, only less often. As a native Wayland client, GTK3 under Mutter ignores `fullscreen_on_monitor()` and `set_keep_above()`. The compositor put both break windows on the same screen (sometimes the laptop, sometimes the external monitor), and a terminal could still come up over them. The log still said "fullscreened and mapped" for each monitor, because it records only what GTK requested. It worked on days when I logged into Xorg, so it looked like it had been fixed. The fix is one line before GTK loads: `os.environ.setdefault("GDK_BACKEND", "x11")` ([`e09a0c8`](https://github.com/ankitg12/xdg-pause/commit/e09a0c8)). Under Wayland the overlay now runs through Xwayland, which honours monitor placement and stacking; under Xorg nothing changes. The sections below that credit native *Wayland* surfaces should be read with this in mind.
+
 ---
 
 ## The Upstream Bug: Why Wayland Ignores Electron Overlays
