@@ -204,6 +204,27 @@ GNOME Shell on Wayland caches extension modules. Turning an extension off and on
 | DDC bus numbers | Change across reboots | `ddcutil --mfg`/`--model`, not `--bus` |
 | Flaky DDC through a dock | Concurrent I²C transactions | Serialize all `ddcutil` calls |
 
+## Update: The trap when switching back to Xorg
+
+When switching the session from Wayland back to Xorg, Mutter parses the same `~/.config/monitors.xml`.
+
+Xorg's display architecture does not support per-monitor mixed scaling. When Mutter encountered the `<scale>2</scale>` entry written for the 4K display on Wayland, it rejected the entire file on startup:
+
+```text
+gnome-shell: Failed to read monitors config file: Logical monitor scales must be identical
+```
+
+The session silently reverted to a default horizontal row layout.
+
+To use the desk under Xorg:
+1. Every configuration in `monitors.xml` must declare `<scale>1</scale>`.
+2. To achieve 2× physical text sizing on the 4K monitor without violating Xorg's uniform scale rule, run the 4K panel at 1920×1080 resolution rather than using Mutter display scaling:
+   ```bash
+   xrandr --output DisplayPort-7 --mode 1920x1080 --pos 1080x0 \
+          --output DisplayPort-8 --pos 3000x0 \
+          --output eDP --pos 1080x1080
+   ```
+
 ## Source
 
 - [Mutter DisplayConfig D-Bus interface](https://gitlab.gnome.org/GNOME/mutter/-/blob/main/data/dbus-interfaces/org.gnome.Mutter.DisplayConfig.xml)
