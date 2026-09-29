@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Three Monitors on GNOME Wayland: Rotation, Scale and Brightness After a Reboot"
-date: 2026-09-29 18:15:00 +0530
+date: 2026-09-29 17:55:00 +0530
 categories: linux wayland debugging
 series: "Moving to Linux"
 ---
