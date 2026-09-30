@@ -33,6 +33,8 @@ One portrait monitor was upside down relative to the other. Settings → Display
 | Xorg (amdgpu DDX) | `DisplayPort-6`, `DisplayPort-7`, `DisplayPort-8` |
 | Wayland (Mutter, KMS) | `DP-7`, `DP-8`, `DP-9` |
 
+(These names are not stable even within one session type. See [Update 2](#update-2-the-dock-renumbers-its-connectors-across-boots).)
+
 So the same four monitors had two independent entries in `monitors.xml`:
 
 ```xml
@@ -200,6 +202,7 @@ GNOME Shell on Wayland caches extension modules. Turning an extension off and on
 |---|---|---|
 | Layout, rotation, scale | `~/.config/monitors.xml`, one entry per connector set | Settings, then `gnome-randr` or Mutter D-Bus when Settings refuses |
 | Xorg vs Wayland differences | Different connector names, so different entries | Fix each session type separately |
+| Dock connector renumbering | Connector names change across boots, so `monitors.xml` misses | Restore by EDID at login (Update 2) |
 | DDC/CI permission | udev `uaccess` rule, by PCI class | `getfacl /dev/i2c-N`, check the GPU's `class` |
 | DDC bus numbers | Change across reboots | `ddcutil --mfg`/`--model`, not `--bus` |
 | Flaky DDC through a dock | Concurrent I²C transactions | Serialize all `ddcutil` calls |
@@ -218,12 +221,40 @@ The session silently reverted to a default horizontal row layout.
 
 To use the desk under Xorg:
 1. Every configuration in `monitors.xml` must declare `<scale>1</scale>`.
-2. To achieve 2× physical text sizing on the 4K monitor without violating Xorg's uniform scale rule, run the 4K panel at 1920×1080 resolution rather than using Mutter display scaling:
+2. To achieve 2× physical text sizing on the 4K monitor without violating Xorg's uniform scale rule, run the 4K panel at 1920×1080 resolution rather than using Mutter display scaling. **The cost is soft text:** each rendered pixel covers a 2×2 block of panel pixels. The next morning I went back to Wayland for this reason (Update 2). The Xorg command was:
    ```bash
    xrandr --output DisplayPort-7 --mode 1920x1080 --pos 1080x0 \
           --output DisplayPort-8 --pos 3000x0 \
           --output eDP --pos 1080x1080
    ```
+
+## Update 2: The dock renumbers its connectors across boots
+
+The next day, the 4K panel came up at scale 1 again after a reboot. The layout I had saved was still in `monitors.xml`. Mutter ignored it:
+
+| Boot | TCL (portrait) | Acer 4K | Dell (portrait) |
+|---|---|---|---|
+| 11:37 session | `DP-10` | `DP-11` | `DP-12` |
+| after reboot | `DP-7` | `DP-8` | `DP-9` |
+
+The dock's DisplayPort MST hub gets new connector numbers from the kernel. Mutter matches a saved layout by connector name **and** EDID. When the names change, it does not find the saved layout and loads an older entry that happens to match the new names. The 4K panel was at scale 1 in that older entry.
+
+No existing tool fixes this on GNOME Wayland. `autorandr` picks profiles by EDID, but it works on X11 only. `kanshi` and `shikane` work only on wlroots compositors. `gnome-randr` and `gdctl` apply a layout from the command line, but they do not keep profiles or react to a hotplug.
+
+So I wrote `mutter-persist.py`. It is a small script that stores layouts in `~/.config/display-layouts.json`. Each stored layout is found by session type plus the set of monitor EDIDs (vendor, product and serial). At login and after each hotplug, the script matches each stored EDID to the connector that monitor has now and calls `ApplyMonitorsConfig`:
+
+```python
+key = session + ":" + ",".join(sorted(f"{v}|{p}|{s}" for (c, v, p, s), *_ in monitors))
+conn_of = {f"{v}|{p}|{s}": c for (c, v, p, s), *_ in monitors}
+layout = [(lm["x"], lm["y"], lm["scale"], lm["transform"], lm["primary"],
+           [(conn_of[m["id"]], m["mode"], {}) for m in lm["monitors"]])
+          for lm in store[key]]
+dc.call_sync("ApplyMonitorsConfig", GLib.Variant(sig, (serial, 1, layout, {})), 0, -1)
+```
+
+**Use method `1`, not `2`.** Method `2` (persistent) makes GNOME show a *"Keep these display settings?"* dialog on every call. If nobody clicks it, the dialog reverts the change after 20 seconds. At login, nobody is there to click it. The script has its own store, so it does not need `monitors.xml` to keep anything. It also skips the call when the current layout already matches the stored one, so the screens do not flicker.
+
+To store a layout after rearranging the screens in Settings: `mutter-persist.py --save`.
 
 ## Source
 
@@ -232,4 +263,5 @@ To use the desk under Xorg:
 - [ddcutil](https://github.com/rockowitz/ddcutil) and its [udev rule](https://github.com/rockowitz/ddcutil/blob/2.0.0-release/data/usr/lib/udev/rules.d/60-ddcutil-i2c.rules)
 - [Brightness control using ddcutil (GNOME extension)](https://github.com/daitj/gnome-display-brightness-ddcutil)
 - [autorandr](https://github.com/phillipberndt/autorandr)
+- [kanshi](https://sr.ht/~emersion/kanshi/) (wlroots only)
 - Earlier in this series: {% post_url 2026-09-20-why-electron-break-timers-fail-on-wayland %}
