@@ -10,7 +10,7 @@ All I wanted was push-to-talk voice dictation on my Linux developer workstation.
 
 On Windows, pressing `Win+H` fires up a serviceable cloud dictation widget. After migrating my daily workflow to an AMD Ryzen AI workstation running Ubuntu 24.04 and GNOME Wayland, I wanted something completely local, private, and zero-latency: tap a physical key on my keyboard, speak a sentence, and have the words cleanly typed at my cursor—whether inside a WezTerm terminal, a browser text area, or an IDE.
 
-What looked like an afternoon utility setup spiraled into a twelve-hour deep dive across Linux input subsystems (`evdev`, `uinput`, `ydotool`), SoundWire array microphone clipping, Vulkan compute on integrated GPUs, the memory arithmetic of 8-bit quantization, and why the entire industry is deeply confused about what "streaming" speech recognition actually means.
+What looked like an afternoon utility setup spiraled into a deep dive across Linux input subsystems (`evdev`, `uinput`, `ydotool`), SoundWire array microphone clipping, Vulkan compute on integrated GPUs, the memory arithmetic of 8-bit quantization, and how easy it is to confuse the different architectural meanings of "streaming" in speech recognition.
 
 Here is the full story, the benchmarks, and the architectural lessons learned from breaking voice dictation five different ways in a single day.
 
@@ -185,7 +185,7 @@ This prompted a deeper realization: **Whisper is fundamentally NOT a streaming m
 
 ## The Three Paradigms of Speech Recognition "Streaming"
 
-Local speech tools frequently slap the word *"Streaming"* onto their feature lists without explaining what is happening under the hood. In practice, speech recognition architectures fall into three distinct paradigms:
+In desktop dictation tools, the label *"Streaming"* is often applied to very different architectural approaches that behave quite differently under the hood. In practice, speech recognition architectures fall into three distinct paradigms:
 
 | Paradigm | Exemplar | Acoustic Context | Computational Complexity | Real-Time Streaming Viability |
 | :--- | :--- | :--- | :---: | :--- |
