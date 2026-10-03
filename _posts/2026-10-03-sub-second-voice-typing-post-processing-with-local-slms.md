@@ -124,7 +124,41 @@ try {
 process.stdout.write(result);
 ```
 
+## Update: The Visual Feedback Problem on GNOME Wayland
+
+Even with sub-350ms semantic cleanup, voice typing remains awkward without immediate visual feedback. When holding a push-to-talk key, how do you know the microphone is active and not hung on an audio buffer?
+
+Voxtype provides an official companion waveform visualizer (`voxtype-osd-gtk4`), but deploying it on Ubuntu 24.04 under GNOME Wayland uncovers two specific desktop compositor hurdles:
+
+### 1. Missing `libgtk4-layer-shell` Dependency
+Upstream packages distribute `voxtype-osd-gtk4` linked dynamically against `libgtk4-layer-shell.so.0`. Ubuntu 24.04 does not package this library in its standard universe repositories. Running the binary yields:
+```
+error while loading shared libraries: libgtk4-layer-shell.so.0: cannot open shared object file: No such file or directory
+```
+The resolution is extracting the shared library directly from the official Debian package (`libgtk4-layer-shell0`) into `~/.local/lib` and pointing `LD_LIBRARY_PATH` to it.
+
+### 2. The GNOME Mutter Layer-Shell Reality
+Once loaded, `voxtype-osd-gtk4` attempts to initialize a Wayland layer surface via the `wlr-layer-shell` protocol:
+```
+voxtype-osd-gtk: it appears your Wayland compositor does not support the Layer Shell protocol
+voxtype-osd-gtk: Failed to initialize layer surface
+```
+GNOME Mutter strictly rejects `wlr-layer-shell`. Because GTK4 removed absolute window positioning APIs like `gtk_window_move()`, the unmanaged window falls back to origin `(0, 0)`—the top-left corner of the primary display.
+
+### Choosing Between Native Wayland and X11 Emulation
+
+There are two practical workarounds on multi-monitor GNOME desktops:
+
+| Approach | Configuration | Window Placement | Trade-off |
+| :--- | :--- | :--- | :--- |
+| **Native Wayland** | Default | Fixed at `(0, 0)` (top-left) | Zero composite overhead; 100% predictable anchor in peripheral vision. |
+| **XWayland Backend** | `GDK_BACKEND=x11` | Centers on active focused monitor | Window placement follows mouse focus, but introduces Xwayland scaling overhead. |
+
+For low latency and crisp HiDPI rendering across mixed DPI monitors, the native Wayland path anchored at `(0, 0)` proves the most reliable daily driver.
+
 ## Source
 
 - [llama.cpp Server](https://github.com/ggerganov/llama.cpp)
 - [Qwen 2.5 1.5B Instruct GGUF](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF)
+- [gtk4-layer-shell](https://github.com/wmww/gtk4-layer-shell)
+- [Debian libgtk4-layer-shell0 Package](https://packages.debian.org/sid/libgtk4-layer-shell0)
