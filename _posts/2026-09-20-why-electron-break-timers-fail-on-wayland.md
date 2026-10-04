@@ -16,6 +16,8 @@ This post documents why Electron break overlays fail on Wayland, why the naive w
 
 > **Update (2026-09-28):** The native GTK3 approach also broke on Wayland, only less often. As a native Wayland client, GTK3 under Mutter ignores `fullscreen_on_monitor()` and `set_keep_above()`. The compositor put both break windows on the same screen (sometimes the laptop, sometimes the external monitor), and a terminal could still come up over them. The log still said "fullscreened and mapped" for each monitor, because it records only what GTK requested. It worked on days when I logged into Xorg, so it looked like it had been fixed. The fix is one line before GTK loads: `os.environ.setdefault("GDK_BACKEND", "x11")` ([`e09a0c8`](https://github.com/ankitg12/xdg-pause/commit/e09a0c8)). Under Wayland the overlay now runs through Xwayland, which honours monitor placement and stacking; under Xorg nothing changes. The sections below that credit native *Wayland* surfaces should be read with this in mind.
 
+> **Update (2026-10-04):** Absorbing every keystroke has a cost. I dictate with [Voxtype](https://github.com/peteonrails/voxtype), which types the transcript through `ydotool` into whichever window has focus. One afternoon I spoke for 44 seconds, a break started in the middle, and I stopped recording while the overlay was still up. The log shows that the transcription succeeded at 16:20:21. The text was then typed into the overlay, which threw it away. Both tools did what they were built to do, and together they lost my words. The fix is a small contract between them. While the overlay is up, xdg-pause writes its PID to `$XDG_RUNTIME_DIR/xdg-pause.active` ([`6b307a8`](https://github.com/ankitg12/xdg-pause/commit/6b307a8)). Voxtype's `pre_output_command` hook waits until that file is gone, or until its PID has died, before it types anything. Voxtype waits for this hook to finish, so the text is held, not dropped. In the next test, I stopped recording at 16:28:57, during the break. The break ended at 16:29:21, and the text appeared in my terminal at 16:29:22. Lesson: an overlay that swallows input must tell other programs that it is on screen. Any program that synthesises keystrokes would otherwise hit the same problem.
+
 ---
 
 ## The Upstream Bug: Why Wayland Ignores Electron Overlays
@@ -220,7 +222,7 @@ The application logic formats durations purely through parameter substitution (`
 
 | Metric | Stretchly (Electron) | DPMS Blanking | `xdg-pause` (Native GTK3) |
 |---|---|---|---|
-| **Wayland Focus Isolation** | ❌ Fails (keystrokes leak) | N/A (displays off) | ✅ 100% absorbed |
+| **Wayland Focus Isolation** | ❌ Fails (keystrokes leak) | N/A (displays off) | ✅ Absorbed, synthetic input too (see 2026-10-04 update) |
 | **Multi-Monitor Stability** | ⚠️ Coordinate offsets ignored | ❌ Scrambles window layout | ✅ Perfect layout preservation |
 | **Visual Aesthetics** | Minimal countdown | Pitch black | Pitch black + depleting progress bar |
 | **Memory Footprint** | ~300–350 MB RAM | 0 MB (D-Bus call) | ~35 MB (exits on break finish) |
