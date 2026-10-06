@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Policy-as-Code for Your Coding Agent's Wallet"
-date: 2026-10-06 10:45:00 +0530
+date: 2026-10-06 10:15:00 +0530
 categories: ai agents productivity
 series: "AI coding agent productivity"
 ---
