@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "Lighter Sessions on Model Switch: Wire-Only Context Pruning for Coding Agents"
-date: 2026-10-06 11:45:00 +0530
+date: 2026-10-06 11:30:00 +0530
 categories: ai agents productivity
 series: "AI coding agent productivity"
 ---
