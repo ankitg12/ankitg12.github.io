@@ -37,6 +37,11 @@ This works in every app, today, and it remains the fallback. But the bottom of a
 
 - Three existing Voxtype GNOME extensions: one uses the monitor under the pointer, one uses the primary monitor, one shows a panel icon. None follows the caret, and none supports Shell 46.
 - One open plan ([Olbrasoft/LinuxDesktop#79](https://github.com/Olbrasoft/LinuxDesktop/issues/79)) gets the caret from AT-SPI, the accessibility bus. It must walk the accessibility tree on every query (with a 250 ms timeout), and terminals such as WezTerm do not expose an AT-SPI text interface.
+- GNOME Shell already contains a caret tracker. The Magnifier's "follow the caret" setting uses [`js/ui/focusCaretTracker.js`](https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/46.0/js/ui/focusCaretTracker.js), which listens for the AT-SPI event `object:text-caret-moved`. I found it after the extension was working, and I did not switch to it, for two reasons:
+  - **Coverage.** An app appears on the accessibility bus only when it has accessibility turned on. On my desktop, with `toolkit-accessibility` set to `false`, Edge was on the bus, but WezTerm and VS Code were not, and those are the two apps I dictate into most. IBus gave a caret for all four apps I tested.
+  - **Cost.** For each event, the [Magnifier](https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/46.0/js/ui/magnifier.js) calls `get_character_extents()` on the app and waits for the reply inside the compositor, with a 250 ms timeout (`Atspi.set_timeout(250, 250)`). If an app is slow to reply, the screen can freeze for up to 250 ms. IBus sends the caret rectangle to the Shell as a signal, so the Shell never waits for an app.
+
+  The design is the same in both: the Magnifier also keeps focus and caret as separate inputs. I kept IBus. If you use Orca or the Magnifier, more apps will be on the bus, and AT-SPI could become a useful second source.
 
 ### 4. Where the caret actually lives
 
@@ -149,3 +154,4 @@ The third bug is the 1991 design surfacing in 2026: the spot was built for a can
 - Fitts's law: <https://en.wikipedia.org/wiki/Fitts%27s_law>
 - GJS guide, debugging and nested Shell: <https://gjs.guide/extensions/development/debugging.html>
 - AT-SPI caret plan: <https://github.com/Olbrasoft/LinuxDesktop/issues/79>
+- GNOME Shell 46 caret tracker (AT-SPI): <https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/46.0/js/ui/focusCaretTracker.js>
