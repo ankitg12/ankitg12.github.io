@@ -90,7 +90,7 @@ Filters the extension needs:
 
 ### 8. The extension, and three bugs found by screenshots
 
-The extension (`voxtype-caret`) does three things:
+The extension, [`voxtype-caret`](https://github.com/ankitg12/voxtype-caret) (GPL-2.0-or-later, install steps in its README), does three things:
 
 1. It watches Voxtype's state file. At `recording` it saves `global.display.focus_window` as the target.
 2. It moves the Voxtype waveform window next to the last caret with `MetaWindow.move_frame()`. A marker file in `$XDG_RUNTIME_DIR` tells the old wrapper to stop its own moves; disabling the extension deletes the marker and the old behaviour returns.
@@ -135,9 +135,11 @@ The third bug is the 1991 design surfacing in 2026: the spot was built for a can
 
 - Tested end to end in WezTerm. Edge, VS Code and Text Editor report usable carets (table above), but I did not test the final placement there.
 - If the target window was closed, `RestoreFocus()` returns false and the text goes wherever focus is. Voxtype treats `pre_output_command` as best effort, so the hook cannot cancel typing. A full guard needs an upstream option such as "non-zero exit sends the text to the clipboard instead".
-- The extension is not published yet. Before it can be, it needs: no local paths in comments or metadata, the stock OSD window class instead of my wrapper's, a measured or configurable terminal cell size, Shell 47+ testing, a licence and a README.
+- The extension is published at <https://github.com/ankitg12/voxtype-caret>. It is tested only on GNOME Shell 46, it uses a private Shell internal, and the terminal cell size is an estimate (see its README). Shell 47+ ports are welcome.
 
 ## Source
+
+- The extension: <https://github.com/ankitg12/voxtype-caret>
 
 - Voxtype: <https://github.com/peteonrails/voxtype>, issue [#801](https://github.com/peteonrails/voxtype/issues/801)
 - GNOME Shell 46 `ibusManager.js`: <https://gitlab.gnome.org/GNOME/gnome-shell/-/blob/46.0/js/misc/ibusManager.js>
