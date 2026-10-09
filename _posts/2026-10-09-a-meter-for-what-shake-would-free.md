@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "A Meter for What /shake Would Free"
-date: 2026-10-09 14:00:00 +0530
+date: 2026-10-09 13:30:00 +0530
 categories: ai agents productivity
 series: "AI coding agent productivity"
 ---
