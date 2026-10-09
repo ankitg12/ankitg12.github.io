@@ -55,7 +55,8 @@ I do not claim nobody has built this. I claim I could not find it. If you know o
 - **Log:** every change goes to `~/.omp/logs/shake-meter.jsonl`, so the meter can be checked
   against what `/shake` later reports.
 
-It is deliberately separate from the extension that *acts* on context (my session governor). A gauge
+It is deliberately separate from the extension that *acts* on context (my
+[session governor]({% post_url 2026-10-06-session-governor-one-policy-engine-for-the-whole-agent-session %})). A gauge
 should not be part of the engine it measures. The governor imports the same function as a rule
 variable, so the footer and the rule always show one number:
 
