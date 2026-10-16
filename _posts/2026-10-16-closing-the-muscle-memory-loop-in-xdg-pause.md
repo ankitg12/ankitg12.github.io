@@ -104,7 +104,7 @@ Logging a skipped break to a personal journal (such as Logseq) is workflow-speci
 | `snooze_start` | `xdg-pause snooze` pauses timer | `XDG_PAUSE_DURATION` (snooze seconds, or `0` if indefinite) |
 | `snooze_end` | `xdg-pause snooze end` resumes timer | `XDG_PAUSE_EVENT=snooze_end` |
 
-Hooks can be configured either as inline shell commands in `~/.config/xdg-pause/config.json` or as executable scripts in `~/.config/xdg-pause/hooks/<event>.d/`:
+Each hook process receives both the `XDG_PAUSE_*` environment variables (convenient for shell one-liners) and a single-line JSON payload on `stdin` (`{"event", "mode", "duration", "elapsed", "remaining", "reason", "timestamp"}`) for structured scripts. Hooks can be configured either as inline shell commands in `~/.config/xdg-pause/config.json` or as executable scripts in `~/.config/xdg-pause/hooks/<event>.d/`:
 
 ```json
 {
