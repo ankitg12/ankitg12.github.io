@@ -117,7 +117,7 @@ Hooks can be configured either as inline shell commands in `~/.config/xdg-pause/
   },
   "hooks": {
     "break_start": null,
-    "break_complete": null,
+    "break_complete": "if [ \"$XDG_PAUSE_MODE\" = \"long\" ]; then lsq -a \"$(date -d \"-${XDG_PAUSE_DURATION} seconds\" +%H:%M) - $(date +%H:%M) [break] 10m long break completed\"; fi",
     "early_exit": "lsq -a \"$(date +%H:%M) [break-skip] Skipped ${XDG_PAUSE_MODE} break after ${XDG_PAUSE_ELAPSED}s/${XDG_PAUSE_DURATION}s — ${XDG_PAUSE_REASON}\"",
     "snooze_start": null,
     "snooze_end": null
