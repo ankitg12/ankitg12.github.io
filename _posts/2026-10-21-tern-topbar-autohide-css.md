@@ -71,7 +71,7 @@ The negative-margin idea came from [firefox-autohide-navbar](https://github.com/
 
 ## Caveats
 
-- **Update (same day): sheets don't survive restart.** `tern ctl css` registers session-only — after quitting Tern the sheet is gone and the top bar is back. Re-apply on launch (`tern ctl css topbar-autohide ~/helpers/tern-topbar-autohide.css`), or move the CSS into a window plugin via `tern.css()` so it installs at `window_start`. The plugin route doubles as the fix for the API's lack of edge-hover primitives.
+- **Update (verified): bundle it.** `styles = ["topbar.css"]` in the window plugin's `plugin.toml` installs the sheet at every `window_start` — survives full quit/reopen, no re-apply command. Restart-tested.
 - The macOS traffic-lights/titlebar strip above it is OS chrome; no CSS reaches it. Fullscreen (`Cmd+Ctrl+F`) is the only move there.
 - This is a local workaround, filed upstream as [stencil-hq/tern-sdk#129](https://github.com/stencil-hq/tern-sdk/issues/129) with the full CSS. A native `topbar_autohide` needs position/JS-driven reveal — pure show/hide can't do edge-hover, as v2/v3 proved.
 
