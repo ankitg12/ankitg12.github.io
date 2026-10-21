@@ -38,10 +38,10 @@ Three sources, strict precedence:
 | Layer | Source | Needs |
 |---|---|---|
 | id list | `GET /zen/go/v1/models` | nothing |
-| context, limits, pricing, vision | local `omp models --json` when present | `omp` on PATH |
+| context, limits, pricing, vision | [models.dev](https://models.dev) snapshot (`opencode-go` rows, sibling `opencode` rows for the 6 ids missing there, one hand patch) | nothing |
 | usage windows | `GET /inference/go/v1/usage` | `--key` / `$OPENCODE_GO_API_KEY` |
 
-The middle layer is optional by design. No `omp` on the machine, no key exported — you still get the id list plus cached enrichment. A missing source means fewer columns, never an error. The binary has zero coupling to any agent harness; anyone with the subscription can use it.
+The middle layer fetches straight from models.dev — no agent harness needed, no key, no local state beyond the cache. The same snapshot OMP hydrates its own `opencode-go` rows from, minus the middleman. A failed fetch just means fewer columns, never an error.
 
 ## The only honest "added on" date
 
