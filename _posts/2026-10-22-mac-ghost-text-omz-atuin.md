@@ -33,7 +33,7 @@ Shell-agnostic — this is zsh config, not terminal config. Same behaviour in Te
 
 ---
 
-## Two traps on the way in
+## Three traps on the way in
 
 **Trap 1: Homebrew owned by someone else.** `brew install` failed because `/opt/homebrew` belonged to another user on the box. Fix is Homebrew's own recommended layout:
 
@@ -50,6 +50,14 @@ zsh-syntax-highlighting: unhandled ZLE widget 'recent-paths'
 
 Load order (highlighter last) is the documented fix per [marlonrichert/zsh-autocomplete#711](https://github.com/marlonrichert/zsh-autocomplete/issues/711), but the warnings persisted — so `zsh-autocomplete` came out of the plugin list entirely. Its dropdown duplicates what Tab plus ghost text already give. Everything else stayed.
 
+**Trap 3: the hook recursion.** With `history-substring-search` listed before `fast-syntax-highlighting`, every Enter printed:
+
+```
+azhw:zle-line-finish:3: maximum nested function level reached; increase FUNCNEST?
+```
+
+HSS registers a `zle-line-finish` hook first (creating the `azhw:` dispatcher); FSH loads after and wraps the dispatcher instead of the raw widget, so each line-finish re-enters the wrapper. Fix is the order printed below — highlighter before substring search. Upstream tracks the real fix in [fast-syntax-highlighting#89](https://github.com/zdharma-continuum/fast-syntax-highlighting/pull/89) (open). Verified with live commands in a running Tern tab, not just a fresh shell probe.
+
 ---
 
 ## The `.zshrc` core
@@ -63,9 +71,9 @@ plugins=(
     fzf
     sudo
     colored-man-pages
-    history-substring-search
-    zsh-autosuggestions
     fast-syntax-highlighting
+    zsh-autosuggestions
+    history-substring-search
 )
 source $ZSH/oh-my-zsh.sh
 
