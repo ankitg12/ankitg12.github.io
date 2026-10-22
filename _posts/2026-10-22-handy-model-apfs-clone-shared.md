@@ -45,7 +45,13 @@ cp -cR ~/.cache/huggingface/hub/models--handy-computer--parakeet-unified-en-0.6b
   /Users/Shared/handy/hub/
 ```
 
-`-c` is the whole trick: copy-on-write clone, zero new blocks. `du` reports 698 MB in both places (logical size); `df` doesn't move (physical size). One physical copy, two logical references.
+`du` reports 698 MB in both places (logical size); `df` doesn't move (physical size). One physical copy, two logical references.
+
+## What APFS is actually doing
+
+APFS is a copy-on-write filesystem: since [macOS 10.13 High Sierra](https://support.apple.com/guide/disk-utility/file-system-formats-dsku19ed921c/mac) it never overwrites live blocks in place. A clone (`cp -c`, exposed to code as `clonefile(2)` / [`NSFileManager copyItemAtPath`](https://developer.apple.com/documentation/Foundation/FileManager)) creates a second directory entry pointing at the same extents, with a reference count — no data blocks move. Writes to either copy later trigger copy-on-write: only the changed blocks split, the rest stay shared. That is why the clone is instant and free, and why a future model revision costs only its new blobs.
+
+How to tell clone from copy: `du` lies (it counts logical size per path), `df` tells the truth (physical blocks allocated). If `df` doesn't move after your "copy", you cloned. Howard Oakley's [APFS files and clones](https://eclecticlight.co/2024/03/20/apfs-files-and-clones/) and his [copy/move/clone primer](https://eclecticlight.co/2020/04/14/copy-move-and-clone-files-in-apfs-a-primer/) are the deepest references on the mechanics — extent reference counts, when clones break, and how snapshots use the same machinery.
 
 The seed script the second account runs (`/Users/Shared/handy/setup-handy-model.sh`):
 
