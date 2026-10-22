@@ -7,6 +7,8 @@ categories: macos ai productivity
 
 Two user accounts on one Mac. Both want local voice dictation. The transcription model is 698 MB. Downloading it twice is wasteful; copying it twice is worse on a 85%-full disk. The fix is one APFS clone and a five-line script.
 
+This is the third post in today's dictation arc: [the human fixed in 5 minutes what the agent spent 90 on]({% post_url 2026-10-22-agent-90-minutes-human-5-minutes-dictation %}), then [the 800 MB Whisper port with three 404s and one deleted download]({% post_url 2026-10-22-eight-hundred-mb-three-404s-deleted-download %}). This one is what happened after Handy won — sharing its model with the second account on the same Mac.
+
 The app is [Handy](https://github.com/cjpais/Handy) — free, open-source, runs Whisper/Parakeet models locally. I installed it on my account; the second account needed the same model without a second download.
 
 ## Where the model actually lives
