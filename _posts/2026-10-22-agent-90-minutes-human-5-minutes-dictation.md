@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "The Agent Spent 90 Minutes on Voice Dictation. The Human Fixed It in 5."
-date: 2026-10-22 07:00:00 +0530
+date: 2026-10-22 06:55:00 +0530
 categories: ai agents productivity macos
 series: "AI coding agent productivity"
 ---
