@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "An 800 MB Model File, Three 404s, and One Deleted Download: Porting Whisper Dictation to macOS"
-date: 2026-10-22 06:30:00 +0530
+date: 2026-10-22 06:10:00 +0530
 categories: macos ai productivity
 series: "Moving to Linux"
 ---
