@@ -3,7 +3,7 @@ layout: post
 title: "The Agent Spent 90 Minutes on Voice Dictation. The Human Fixed It in 5."
 date: 2026-10-22 06:55:00 +0530
 categories: ai agents productivity macos
-series: "AI coding agent productivity"
+series: "Agent Mishaps"
 ---
 
 My Mac's built-in dictation garbled every technical sentence. I asked my coding agent to fix it. Ninety minutes, 200+ tool calls, three 404s, one deleted 785 MB download, two upstream-worthy bug finds — and zero working dictation. Then I installed Handy myself in five minutes and dictated this sentence through it.

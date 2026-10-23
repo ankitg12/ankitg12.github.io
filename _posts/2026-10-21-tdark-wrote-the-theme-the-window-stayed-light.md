@@ -3,6 +3,7 @@ layout: post
 title: "tdark Wrote the Theme. The Window Stayed Light."
 date: 2026-10-21 19:55:00 +0530
 categories: terminal productivity
+series: "Agent Mishaps"
 ---
 
 `tdark` returned success. The window stayed light. Reloading the terminal applied light again.
