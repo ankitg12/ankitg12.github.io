@@ -33,7 +33,7 @@ The loop condition is the fixpoint: when a pass deletes zero dirs, the tree is c
 
 ## The script
 
-Python, stdlib only, macOS/Windows/Linux: [prune-empty-dirs.py gist](https://gist.github.com/ankitg12/604342887516c2643b4bb2511c8fe94e). Bash twin for Mac/Linux in the same `~/tools`. Same flags:
+Python, stdlib only, macOS/Windows/Linux: [prune-empty-dirs.py gist](https://gist.github.com/ankitg12/604342887516c2643b4bb2511c8fe94e). A bash port for Mac/Linux follows the same logic. Same flags:
 
 ```bash
 prune-empty-dirs.py --prune-markers /Volumes/Samsung_T5   # preview
