@@ -126,3 +126,27 @@ it after running a fleet across three machines](https://ai.engineer/talks/i-run-
 
 Keep the engineer as author. Let agents write, let CI run free, let agents
 repair. Both camps survive — each where it wins.
+
+---
+
+## Update (2026-10-23): not fashionable — metered while nobody watches
+
+A reader pushed back on the lede: is the run-everything-through-agents side
+really "fashionable," or is it something else? Fair challenge. The evidence
+says it is a split with a clock on it.
+
+One developer's [$37,901.73 Bedrock bill](https://hemantvirmani.substack.com/p/someone-just-got-a-38000-aws-bill)
+came not from a leak or a loop but from prompt caching silently failing
+across a proxy chain — 6.47 billion uncached input tokens. The line that
+matters: *supported is not the same as actually using correctly.* At
+enterprise scale, a 2,000-engineer org runs [$1.66M a month across five coding
+tools with no common chargeback table](https://futureagi.com/blog/enterprise-llm-gateway-cost-tracking-coding-agents-2026/).
+The responses are institutional now: [real-time spend enforcement on
+Bedrock](https://aws.amazon.com/blogs/machine-learning/tokenomics-at-scale-how-jamf-built-real-time-spend-enforcement-for-amazon-bedrock/),
+[see, cap, and reduce agent spend as a shipped
+feature](https://about.gitlab.com/blog/make-every-ai-credit-count/).
+
+So the correction: the metered-everything argument is winning while nobody
+watches the meter — and the meter is about to arrive. Most engineers have no
+idea what their sessions cost; the lala land lasts until the first chargeback
+table. The rest of the post stands.
