@@ -27,3 +27,27 @@ That last point generalizes. The write path is not the product; the retrieval pa
 One honest boundary: the idle-timer auto-fire — the thing that makes this "dreams" rather than "a command I run" — hasn't been verified end to end. Manual `/dream` works, the cron script works, the timer arms and the gate logic is tested. Whether a 30-minute-idle session actually wakes up and consolidates unattended is still open. I'm running it, not claiming it.
 
 The code, the skill, and both scripts are in the public repo. If the idle path verifies, the post gets an update. If it doesn't, the post gets a more interesting update.
+
+---
+
+## How it is wired
+
+Three triggers, one pass:
+
+| Trigger | Mechanism |
+|---|---|
+| Idle 30 min | in-session timer, re-armed on every turn |
+| `/dream` | slash command (`now` / `status` / `diary` / `log`) |
+| cron | `omp-dream` headless script, no live session needed |
+
+Config lives in `~/.omp/agent/agent-dream.json` (all fields optional): `idleMs`, `minIntervalMs`, `diaryPath`, `maxSessions`, `maxDiaryEntries`, `maxMemoriesPerPass`, `maxDiaryEntryLines`, `logPath`, `memoryFile` (empty = diary-only), `reportPath`, `enabled`, `debug`. Last-pass state in `agent-dream-state.json`; the skill's report JSON folds into it on next start.
+
+---
+
+## Files and references
+
+- Extension: [github.com/ankitg12/omp-extensions](https://github.com/ankitg12/omp-extensions) (`packages/agent-dream-omp/`) — `dream.ts`, `dream-state.ts`, `SKILL.md`, `dream-index`, `dream-diary`, `omp-dream`
+- Upstream timer-API gap: [oh-my-pi#16924](https://github.com/can1357/oh-my-pi/issues/16924)
+- Unmerged upstream PR, same idea, pipeline-integrated: [oh-my-pi#8716](https://github.com/can1357/oh-my-pi/pull/8716)
+- Retrieval-path pattern: [Chanl on async consolidation](https://www.channel.tel/blog/agent-async-memory-consolidation-dreaming)
+- The API it mirrors: [Anthropic Dreams](https://platform.claude.com/docs/en/managed-agents/dreams)
