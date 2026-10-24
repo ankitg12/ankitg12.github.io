@@ -8,57 +8,22 @@ series: "AI coding agent productivity"
 
 Every session with my coding agent starts from zero. Preferences I stated last week, tool quirks I diagnosed last month, corrections I made yesterday — all gone. The agent re-learns them by annoying me again.
 
-Anthropic's answer is [Dreams](https://platform.claude.com/docs/en/managed-agents/dreams): async jobs that mine 1–100 past sessions for durable lessons and produce a memory store you review before swapping in. [OMP](https://github.com/can1357/oh-my-pi) has no equivalent — its `/memory` pipeline consolidates incrementally, and there's an [open PR (#8716)](https://github.com/can1357/oh-my-pi/pull/8716) for idle-time consolidation that hasn't merged. So I built it as a user-space extension. No fork.
+Anthropic's answer is [Dreams](https://platform.claude.com/docs/en/managed-agents/dreams): async jobs that mine 1–100 past sessions for durable lessons and produce a memory store you review before swapping in. [OMP](https://github.com/can1357/oh-my-pi) has nothing like it. Its `/memory` pipeline consolidates incrementally, session by session, and the one attempt at idle-time consolidation — [PR #8716](https://github.com/can1357/oh-my-pi/pull/8716), open since August — hasn't merged. I didn't want to maintain a fork to get one feature. So the whole thing lives in user space: an extension, a skill file, two scripts, and a cron job. No fork, no upstream patch, survives `omp update`.
 
----
+The extension is [agent-dream-omp](https://github.com/ankitg12/omp-extensions). First verified run, this morning: 10 sessions scanned, 14 memories written, one diary entry. The memories were real — config conventions I'd stated across different sessions, corrections I'd made to agent behavior, repo-layout rules I'd laid down weeks apart and never written anywhere. That last category is the one that stung. I had rules I was enforcing and nowhere to keep them.
 
-## What it does
+The interesting part isn't the consolidation. It's the two ways the build failed before it worked, because both failures are about how OMP extensions actually behave versus how the docs say they behave.
 
-`agent-dream-omp` ([repo](https://github.com/ankitg12/omp-extensions)) runs a consolidation pass over recent session JSONLs: extract durable signal, update memory, prepend a `DREAMS.md` diary entry. Three triggers:
+The first failure was silent. My extension injected the consolidation prompt with `sendUserMessage(text, { deliverAs: "followUp" })` — the documented way to queue a message. Six passes injected across two sessions. Zero executed. The SDK types contain the answer in one sentence, buried in the `ExtensionContext` docs: *"When deliverAs is set, queue the message instead of starting a new turn."* Queued is not run. My six passes sat in the queue waiting for a user turn that never referenced them, and the extension logged each one as a success because delivery had succeeded. The state file said `totalPasses: 6, lastSessions: null` — injected six times, executed zero. That null was the whole story.
 
-| Trigger | Mechanism |
-|---|---|
-| Idle 30 min | in-session timer, re-armed on every turn |
-| `/dream` | slash command, manual |
-| cron | `omp-dream` headless script, no live session |
+The fix is `sendMessage({ customType, content, display: true }, { triggerTurn: true, deliverAs: "nextTurn" })`. `triggerTurn: true` "schedules an internal continuation" — as far as I can tell, the only extension API that starts model work rather than queuing text near it. No bundled extension uses it. The model treats the `role: "custom"` message as an instruction and goes to work with file tools. That gap between the docs and the shipped SDK is now [oh-my-pi#16924](https://github.com/can1357/oh-my-pi/issues/16924): the documented managed timers (`ctx.setTimeout`/`ctx.clearTimer`) don't exist in `pi-coding-agent@16.1.16` either, so every bundled extension that needs a timer — `agent-afk`, `session-reminder` — ships the raw `setInterval` pattern the docs warn will take down the session.
 
-First verified pass: 10 sessions scanned, 14 memories written, one diary entry. Real content — config conventions, user corrections, repo-layout rules mined from actual history.
+The second failure was cost. Once the pass actually ran, I watched it burn a dozen tool calls in two minutes — four or five just listing session files and sorting by mtime across two directory levels, then more calls discovering the memory backend config, paths it could have been told. It did good extraction work and then kept digging past the point of diminishing returns, because nothing told it to stop. Three changes fixed the economics, and they're all about moving knowledge from discovery to injection:
 
----
+A `dream-index` script prints `mtime lines path` newest-first in one call — the entire discovery phase collapses into it. A `dream-diary` script takes an entry body and handles prepend-plus-trim atomically, so the model never does read-modify-write surgery on a growing file. And the injected prompt carries a tool budget ("~15 calls; report partial rather than grinding"), a stop rule (quit after two consecutive sessions with zero new signal), and the exact memory target resolved by the extension from config — including the option of no memory file at all, in which case lessons go to the diary and the extension is forbidden from inventing paths.
 
-## The one SDK discovery that shaped everything
+That last point generalizes. The write path is not the product; the retrieval path is. Testing that the diary got an entry proves filing works. It says nothing about whether the next session is smarter. The pattern that closed the loop came from [Chanl's writeup of the same problem](https://www.channel.tel/blog/agent-async-memory-consolidation-dreaming): gate the write, test the read. The skill carries an extraction blocklist — never security exceptions, access grants, auth bypasses, credentials, one-time secrets, transient states, anything uncertain, anything expiring under a week, with "when in doubt, discard" as the default — because a transcript containing "skip verification for this account" must not become a memory. And the skill ends by writing a report JSON the extension folds into state on next start, so `/dream status` reports what actually happened instead of what was injected. The documented verification is a four-session loop: plant a preference, consolidate, check a fresh session uses it, reverse the preference, consolidate, check the fresh session follows the new value.
 
-My first build injected the pass with `sendUserMessage(text, { deliverAs: "followUp" })`. Six passes injected, zero executed. The SDK types say why, if you read them: *"When deliverAs is set, queue the message instead of starting a new turn."* Queued ≠ run. The passes sat in the queue waiting for a user turn that never referenced them.
+One honest boundary: the idle-timer auto-fire — the thing that makes this "dreams" rather than "a command I run" — hasn't been verified end to end. Manual `/dream` works, the cron script works, the timer arms and the gate logic is tested. Whether a 30-minute-idle session actually wakes up and consolidates unattended is still open. I'm running it, not claiming it.
 
-The fix: `sendMessage({ customType, content, display: true }, { triggerTurn: true, deliverAs: "nextTurn" })`. `triggerTurn: true` "schedules an internal continuation" — the only extension API that starts model work. I filed [oh-my-pi#16924](https://github.com/can1357/oh-my-pi/issues/16924) separately: the docs describe managed `ctx.setTimeout`/`ctx.clearTimer` timers that don't exist in the shipped SDK, so every bundled extension uses raw timers the docs warn against.
-
----
-
-## What the pass actually costs (and the scripts that cut it)
-
-Watching the first working pass, the model burned ~12 tool calls in 2 minutes — 4–5 just listing and mtime-sorting session files across two directory levels, plus repeated backend-config discovery. Two `bun` scripts ship with the extension and the injected prompt orders their use:
-
-- **`dream-index [--max N] [--exclude <id>]`** — session JSONLs newest-first (`mtime lines path`). One call replaces the whole discovery phase.
-- **`dream-diary --diary <path> --max <n> --entry-file <tmp>`** — prepend entry + trim, atomically. No read-modify-write roulette on a growing file.
-
-Plus two prompt rules that matter more than they sound: a ~15 tool-call budget ("report partial rather than grinding") and stop-after-two-zero-signal-sessions. The prompt also names the exact memory target — the extension resolves it from config, so the pass spends zero calls discovering backends. A `memoryFile` config field (empty = diary-only) means the extension never invents paths.
-
-## The write path is not the product
-
-Testing the write (cooldowns, caps, diary trim) is necessary and insufficient. The pattern that closed the loop came from [Chanl's writeup of the same problem](https://www.channel.tel/blog/agent-async-memory-consolidation-dreaming): gate the write path and test the retrieval path.
-
-- **Extraction allowlist/blocklist in the skill.** Extract only: explicit preferences, stable facts, confirmed tool quirks, stated decision patterns, user corrections — each with a source. Never: security exceptions, access grants, auth bypasses, credentials, one-time secrets, transient states, uncertain facts, anything expiring under 7 days. *"When in doubt, discard — noisy retrieval is worse than no retrieval."* A session transcript containing "skip verification for this account" must not become a memory.
-- **Report-back contract.** The skill writes `{"sessions", "memories", "diaryEntry", "at"}` JSON; the extension folds it into state on next start. `/dream status` reads state — truthful, not "last injected."
-- **Retrieval test (documented, manual for now):** plant a preference in session one → `/dream now` → fresh session two must use it → session three states the opposite → `/dream now` → session four follows the new value.
-
-## What's still unproven
-
-The idle-timer auto-fire path hasn't been verified end-to-end — only manual `/dream` and the cron script. Framed honestly: manual + cron verified, idle-timer in testing. The consolidation it did is real either way.
-
----
-
-## Files
-
-- Extension: [github.com/ankitg12/omp-extensions](https://github.com/ankitg12/omp-extensions) (`packages/agent-dream-omp/`) — `dream.ts`, `dream-state.ts`, `SKILL.md`, `dream-index`, `dream-diary`, `omp-dream`
-- Upstream issue (timer API gap): [oh-my-pi#16924](https://github.com/can1357/oh-my-pi/issues/16924)
-- Unmerged upstream PR (same idea, pipeline-integrated): [oh-my-pi#8716](https://github.com/can1357/oh-my-pi/pull/8716)
+The code, the skill, and both scripts are in the public repo. If the idle path verifies, the post gets an update. If it doesn't, the post gets a more interesting update.
