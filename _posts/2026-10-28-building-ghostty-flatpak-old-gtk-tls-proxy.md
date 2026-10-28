@@ -6,13 +6,13 @@ categories: ai tools linux
 series: "AI coding agent productivity"
 ---
 
-Ghostty 1.4.0 needs GTK 4.18. My Ubuntu 24.04 laptop ships GTK 4.14, the snap bundles 4.14 too, and Nix was unusable without root. The release notes were hours old, so I asked my coding agent to get it running without touching the system.
+[Ghostty](https://ghostty.org) [1.4.0](https://ghostty.org/docs/install/release-notes/1-4-0) needs [GTK](https://www.gtk.org) 4.18. My [Ubuntu 24.04](https://releases.ubuntu.com/24.04/) laptop ships GTK 4.14, the [snap](https://snapcraft.io/ghostty) bundles 4.14 too, and [Nix](https://nixos.org) was unusable without root. The [release notes](https://ghostty.org/docs/install/release-notes/1-4-0) were hours old, so I asked my coding agent to get it running without touching the system.
 
 The build failed five different ways, and then the agent caused a sixth problem itself. This is the log of all of them.
 
 ## The route: use the app's own Flatpak manifest
 
-A Flatpak build brings its own runtime, so the host GTK stops mattering. Ghostty ships `flatpak/com.mitchellh.ghostty.yml`, which targets the GNOME 50 runtime (GTK 4.22). Everything installs at user scope, so no root and no change to the snap:
+A [Flatpak](https://flatpak.org) build brings its own runtime, so the host GTK stops mattering. Ghostty ships [`flatpak/com.mitchellh.ghostty.yml`](https://github.com/ghostty-org/ghostty/tree/v1.4.0/flatpak), which targets the GNOME 50 runtime (GTK 4.22) from [Flathub](https://flathub.org). Everything installs at user scope, so no root and no change to the snap:
 
 ```bash
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
@@ -52,13 +52,13 @@ git -C "$MIRROR" update-ref "refs/heads/pin-${SHA:0:7}" "$SHA"
 
 ## Failure 5: the manifest was one Zig release behind
 
-The build ran for a long time, then stopped with a Zig version error. `build.zig.zon` required 0.17.0 and `flatpak/dependencies.yml` still downloaded 0.16.0. I did not edit the upstream files. A generated overlay manifest pointed at the new tarball, with the checksum taken from `ziglang.org/download/index.json`. After that the build finished, and `+version` reported 1.4.0 on GTK 4.22.5 and libadwaita 1.9.4.
+The build ran for a long time, then stopped with a [Zig](https://ziglang.org) version error. `build.zig.zon` required 0.17.0 and `flatpak/dependencies.yml` still downloaded 0.16.0. I did not edit the upstream files. A generated overlay manifest pointed at the new tarball, with the checksum taken from `ziglang.org/download/index.json`. After that the build finished, and `+version` reported 1.4.0 on GTK 4.22.5 and [libadwaita](https://gnome.pages.gitlab.gnome.org/libadwaita/) 1.9.4.
 
 All five fixes are one script, so the next release is one command: `build.sh [checkout]`.
 
 ## The mistake that was not in the build
 
-To smoke-test the new build, the agent used the app's GTK action interface over D-Bus: open a tab, then close the window. Both the snap and the Flatpak own the name `com.mitchellh.ghostty`. The calls went to the snap, and it closed my live terminal window. The 1.4.0 instance it meant to test was untouched.
+To smoke-test the new build, the agent used the app's GTK action interface over [D-Bus](https://dbus.freedesktop.org/doc/dbus-specification.html): open a tab, then close the window. Both the snap and the Flatpak own the name `com.mitchellh.ghostty`. The calls went to the snap, and it closed my live terminal window. The 1.4.0 instance it meant to test was untouched.
 
 The lesson is general. **Two builds with one application ID share one bus name, and a control call reaches whoever owns it.** Before any D-Bus or single-instance call, ask the bus who answers:
 
@@ -75,7 +75,7 @@ Ghostty in a Flatpak runs your shell on the host through the `org.freedesktop.Fl
 | `-e` command | Result |
 |---|---|
 | `/bin/sh -c '...'` | runs on the host |
-| `tmux new-session ...` | runs, attaches |
+| [`tmux`](https://github.com/tmux/tmux/wiki) `new-session ...` | runs, attaches |
 | `ssh` with the host agent | works |
 | script under `$HOME` | runs |
 | script in `/tmp` | `FlatpakSpawnFail`: "terminal is non-functional" |
@@ -124,10 +124,28 @@ ln -sfn ~/.config/ghostty/config.ghostty ~/.var/app/com.mitchellh.ghostty/config
 
 If you also run another Ghostty build, start the Flatpak with its own class and no single-instance, as described above, so the two do not share one bus name.
 
+## Make it the default, with a way back
+
+Two symlinks and a wrapper do it. The wrapper runs the Flatpak, and runs the snap when `GHOSTTY_USE_SNAP` is set or the Flatpak is missing:
+
+```sh
+#!/bin/sh
+if [ -n "${GHOSTTY_USE_SNAP:-}" ] || ! flatpak info --user com.mitchellh.ghostty >/dev/null 2>&1; then
+  exec /snap/bin/ghostty "$@"
+fi
+exec flatpak run com.mitchellh.ghostty "$@"
+```
+
+```bash
+ln -s ~/tools/ghostty-flatpak/ghostty ~/.local/bin/ghostty   # bare `ghostty` is now the Flatpak
+```
+
+`~/.local/bin` comes before `/snap/bin` on `PATH` here, so the link wins. To go back, delete the link. A launch script that calls bare `ghostty` (a window manager, a terminal multiplexer wrapper) picks up the change with no edit. I ran one such launch, built by my own window-launcher code, through the link: the child ran on the host with the ssh agent and the host `tmux` visible.
+
 ## Not checked
 
 - Whether shell integration works in the Flatpak. The integration files are present inside the sandbox; I did not run a session to see them load.
-- A visual check of the window. GNOME on Wayland blocks screenshots from plain clients, so the evidence is `+version`, config loading, and the D-Bus window objects.
+- A visual check of the window. [GNOME](https://www.gnome.org) on [Wayland](https://wayland.freedesktop.org) blocks screenshots from plain clients, so the evidence is `+version`, config loading, and the D-Bus window objects.
 - Anything past the launch patterns in the table above, such as a long ssh or tmux session.
 
 ## Source
