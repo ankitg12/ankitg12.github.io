@@ -1,14 +1,14 @@
 ---
 layout: post
-title: "Building a Too-New GTK App as a User Flatpak: Four Failures, and the One My Agent Caused"
+title: "Building a Too-New GTK App as a User Flatpak: Five Failures, and the One My Agent Caused"
 date: 2026-10-28 16:05:00 +0530
 categories: ai tools linux
 series: "AI coding agent productivity"
 ---
 
-Ghostty 1.4.0 needs GTK 4.18. My Ubuntu 24.04 laptop ships GTK 4.14, the snap bundles 4.14 too, and Nix was unusable without root. The release notes were hours old and I wanted the build anyway, so I asked my coding agent to get it running without touching the system.
+Ghostty 1.4.0 needs GTK 4.18. My Ubuntu 24.04 laptop ships GTK 4.14, the snap bundles 4.14 too, and Nix was unusable without root. The release notes were hours old, so I asked my coding agent to get it running without touching the system.
 
-It took one `flatpak-builder` run that failed four different ways, and then a fifth problem the agent caused itself. This is the log of all of them.
+The build failed five different ways, and then the agent caused a sixth problem itself. This is the log of all of them.
 
 ## The route: use the app's own Flatpak manifest
 
@@ -60,7 +60,7 @@ All five fixes are one script, so the next release is one command: `build.sh [ch
 
 To smoke-test the new build, the agent used the app's GTK action interface over D-Bus: open a tab, then close the window. Both the snap and the Flatpak own the name `com.mitchellh.ghostty`. The calls went to the snap, and it closed my live terminal window. The 1.4.0 instance it meant to test was untouched.
 
-The window was not carrying anything I needed, so the cost was small. The lesson is general. **Two builds with one application ID share one bus name, and a control call reaches whoever owns it.** Before any D-Bus or single-instance call, ask the bus who answers:
+The lesson is general. **Two builds with one application ID share one bus name, and a control call reaches whoever owns it.** Before any D-Bus or single-instance call, ask the bus who answers:
 
 ```bash
 busctl --user list | awk '/ghostty/ {print $1, $2}'
@@ -82,9 +82,53 @@ Ghostty in a Flatpak runs your shell on the host through the `org.freedesktop.Fl
 
 The sandbox has a private `/tmp`. The executable path is resolved there, so a script that exists only in the host's `/tmp` fails with `AccessDenied`. Keep launch scripts under `$HOME`.
 
-## Not verified
+## Use it on your own machine
 
-Shell integration did not load in the Flatpak (`shell could not be detected` in the log). I did not take a screenshot, because GNOME on Wayland blocks it for plain clients. I have not yet made the Flatpak the default; the snap stays the launcher until I have used 1.4.0 for a few days.
+You need a Linux host with `flatpak` and `flatpak-builder` (the `org.flatpak.Builder` Flatpak works if the distro package is old), about 6 GB of free disk, and a checkout of the Ghostty tag you want.
+
+```bash
+# 1. Source at the release tag
+git clone --depth 1 --branch v1.4.0 https://github.com/ghostty-org/ghostty
+cd ghostty
+
+# 2. Runtimes, user scope (about 1.3 GB)
+flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+flatpak install --user -y flathub org.flatpak.Builder org.gnome.Platform//50 org.gnome.Sdk//50
+
+# 3. Build and install
+flatpak run --command=flatpak-builder org.flatpak.Builder \
+  --user --install --force-clean --disable-rofiles-fuse \
+  --state-dir=$HOME/.cache/ghostty-fpbuild/state \
+  $HOME/.cache/ghostty-fpbuild/build flatpak/com.mitchellh.ghostty.yml
+
+# 4. Run, and check the version
+flatpak run com.mitchellh.ghostty +version
+```
+
+On a plain network that is all. Add the fixes above only when you see the matching error:
+
+| Symptom | Add to the `flatpak run --command=flatpak-builder` line |
+|---|---|
+| TLS verification failure on downloads | `--env=CURL_CA_BUNDLE=/run/host/etc/ssl/certs/ca-certificates.crt --env=SSL_CERT_FILE=/run/host/etc/ssl/certs/ca-certificates.crt` |
+| `publickey` error on an `https://` source | `--env=GIT_CONFIG_GLOBAL=<file without the insteadOf rule>` |
+| `unable to read tree` | delete `state/cache` and `state/build`, rerun |
+| a git source fails on a pinned SHA | fetch the SHA into `state/git/<mirror>` first, then `update-ref` |
+| Zig version error | compare `minimum_zig_version` in `build.zig.zon` with the URL in `flatpak/dependencies.yml`; use an overlay manifest |
+
+The Flatpak reads its config from `~/.var/app/com.mitchellh.ghostty/config/ghostty/config.ghostty`, not `~/.config/ghostty/`. A symlink between the two keeps one file:
+
+```bash
+mkdir -p ~/.var/app/com.mitchellh.ghostty/config/ghostty
+ln -sfn ~/.config/ghostty/config.ghostty ~/.var/app/com.mitchellh.ghostty/config/ghostty/config.ghostty
+```
+
+If you also run another Ghostty build, start the Flatpak with its own class and no single-instance, as described above, so the two do not share one bus name.
+
+## Not checked
+
+- Whether shell integration works in the Flatpak. The integration files are present inside the sandbox; I did not run a session to see them load.
+- A visual check of the window. GNOME on Wayland blocks screenshots from plain clients, so the evidence is `+version`, config loading, and the D-Bus window objects.
+- Anything past the launch patterns in the table above, such as a long ssh or tmux session.
 
 ## Source
 
