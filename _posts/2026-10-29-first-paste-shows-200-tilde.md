@@ -65,9 +65,9 @@ setsid -f ghostty --title=paste-capture -e \
   script -q --log-in /tmp/paste-in.log --log-timing /tmp/paste-in.tm -c 'bash -i'
 ```
 
-The log on the host stayed at 0 bytes. This Ghostty is the [snap](https://snapcraft.io/ghostty) build. `pgrep` showed it running under `bwrap` ([bubblewrap](https://github.com/containers/bubblewrap)), so its `/tmp` is not the host `/tmp`.
+The log stayed at 0 bytes. This Ghostty is the [snap](https://snapcraft.io/ghostty) build, and `pgrep` showed it under `bwrap` ([bubblewrap](https://github.com/containers/bubblewrap)). The agent first said that the window therefore had a private `/tmp`. That was wrong. `snap info` shows `classic` confinement, and a probe file that `ghostty -e` wrote to `/tmp` was visible on the host.
 
-The second attempt wrote to `$HOME` instead. That log also stayed at 0 bytes, also after a `SIGTERM` to `script`. Both times my pastes in the capture window were clean.
+The second attempt wrote to `$HOME`. That log also stayed at 0 bytes, also after a `SIGTERM` to `script`. Both times my pastes in the capture window were clean.
 
 ## What I saw myself
 
@@ -114,7 +114,7 @@ The order I would use now:
 - Why the line editor took the start marker as text but not the end marker.
 - Whether a TUI that exited in that tab left the terminal in a bad state before the paste.
 - Whether the copy source (terminal selection, browser, editor) makes a difference.
-- Why the second `script` capture, written to `$HOME`, stayed empty.
+- Why both `script --log-in` captures stayed empty.
 - Whether the second terminal emulator fails in the same way.
 
 ## Next time it happens
@@ -123,7 +123,7 @@ The session ended with this checklist:
 
 1. Write down what that tab did just before the paste: a new tab, a TUI exit, Ctrl+C on a command, a long idle time.
 2. Note where the text was copied from.
-3. Get a timed byte capture of a failing first paste from a terminal that is not sandboxed, so the log is visible on the host.
+3. Get a timed byte capture of a failing first paste. The `script --log-in` method above recorded nothing, so this needs a different capture method.
 
 Status: open, no reproduction yet.
 
