@@ -6,7 +6,7 @@ categories: linux terminal debugging
 series: "Moving to Linux"
 ---
 
-I pasted a command into [Ghostty](https://ghostty.org/) on [Ubuntu](https://ubuntu.com/) and the prompt showed `^[[200~` before the text. The shell coloured the whole line red as a syntax error. I had seen the same thing in a second terminal emulator.
+I pasted a command into [Ghostty](https://ghostty.org/) (a self-built 1.4.0) on [Ubuntu](https://ubuntu.com/) and the prompt showed `^[[200~` before the text. The shell coloured the whole line red as a syntax error. I had seen the same thing in a second terminal emulator.
 
 The fault is still not fixed. This post records what is known, what was tested, and what to capture the next time it happens.
 
@@ -65,7 +65,7 @@ setsid -f ghostty --title=paste-capture -e \
   script -q --log-in /tmp/paste-in.log --log-timing /tmp/paste-in.tm -c 'bash -i'
 ```
 
-The log stayed at 0 bytes. This Ghostty is the [snap](https://snapcraft.io/ghostty) build, and `pgrep` showed it under `bwrap` ([bubblewrap](https://github.com/containers/bubblewrap)). The agent first said that the window therefore had a private `/tmp`. That was wrong. `snap info` shows `classic` confinement, and a probe file that `ghostty -e` wrote to `/tmp` was visible on the host.
+The log stayed at 0 bytes. This Ghostty is my self-built 1.4.0 [Flatpak]({% post_url 2026-10-28-building-ghostty-flatpak-old-gtk-tls-proxy %}), and `pgrep` showed it under `bwrap` ([bubblewrap](https://github.com/containers/bubblewrap)). The agent said that the window therefore had a private `/tmp`. That is true for the sandbox, but not for the `-e` command: Flatpak Ghostty runs `-e` children on the host. A probe file that `ghostty -e` wrote to `/tmp` was visible on the host.
 
 The second attempt wrote to `$HOME`. That log also stayed at 0 bytes, also after a `SIGTERM` to `script`. Both times my pastes in the capture window were clean.
 
