@@ -82,7 +82,7 @@ OMP's catalog also offers a `dictation` role — [`parakeet-tdt-0.6b-v3`](https:
 Two threads deliberately left open:
 
 1. **Voice cloning** — [Chatterbox Turbo](https://huggingface.co/ResembleAI/chatterbox-turbo-ONNX) clones from seconds of audio and beat ElevenLabs blind. If I ever want the agent to sound like *me* reading release notes, that's the trial. Cost: a separate install outside OMP, real VRAM (4–8 GB).
-2. **The Rust-native path** — [`sayneat`](https://github.com/search?q=sayneat) (Rust TTS CLI) now ships four local engines with Kokoro recommended: int8 (~147 MB, 103 EN+ZH voices), a full-precision `kokoro-hq` (~365 MB, skips the high-frequency filter that softens int8 hiss), a compact `kitten` (~68 MB, 8 voices), and 44.1 kHz `supertonic` (~129 MB). If the int8 hiss ever bothers me, `kokoro-hq` is the 365 MB answer — still inside my 700 MB budget.
+2. **The Rust-native path** — [`sayneat`](https://gitlab.com/parlant-co/sayneat) (Rust TTS CLI, GitLab) now ships four local engines with Kokoro recommended: int8 (~147 MB, 103 EN+ZH voices), a full-precision `kokoro-hq` (~365 MB, skips the high-frequency filter that softens int8 hiss), a compact `kitten` (~68 MB, 8 voices), and 44.1 kHz `supertonic` (~129 MB). If the int8 hiss ever bothers me, `kokoro-hq` is the 365 MB answer — still inside my 700 MB budget.
 
 ## The one-line setup
 
