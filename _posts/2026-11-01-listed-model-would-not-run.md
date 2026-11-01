@@ -43,7 +43,6 @@ $ openclaw infer model list --json | grep -c opencode-go
 provider=opencode-go model=deepseek-v4-pro status=200
 Unknown model: opencode-go/muse-spark-1.3-contributor ... runner=embedded ... status=format
 ```
-
 ## The workaround: one `models-add` row
 
 The [upstream issue](https://github.com/openclaw/openclaw/issues/142793) documents the escape hatch: declare the missing model under `models.providers` with `metadataSource: "models-add"`. It also warns that a non-empty `models[]` entry [shadows the plugin catalog](https://github.com/openclaw/openclaw/issues/165414) on some builds — 29 models collapsing to 10. On my build (2026.10.9) that didn't happen; the list stayed full. A [fix for local turns](https://github.com/openclaw/openclaw/pull/168618) merged 2026-10-11, two days after my build — the gateway path I use still fails without the patch.
@@ -61,6 +60,7 @@ I only use spark, so the patch is one row plus runtime mappings, in `~/.openclaw
             input: ["text", "image"], contextWindow: 1048576,
             metadataSource: "models-add" },
         ],
+        baseUrl: "https://opencode.ai/zen/go/v1",
       },
     },
   },
@@ -75,7 +75,8 @@ I only use spark, so the patch is one row plus runtime mappings, in `~/.openclaw
 }
 ```
 
-Both pieces matter. The `models-add` row teaches the resolver the model exists. The `agentRuntime` mapping in `agents.defaults.models` (and `agents.entries.main.models`) tells the runner which harness executes it. I learned this the asymmetric way — the first patch had the entry but the old `deepseek-v4-pro` mapping, and the default flipped without resolving.
+
+Gotcha that bit me: the patch tooling wrote `"baseUrl": ""` into the provider block, which overrode the plugin's own `https://opencode.ai/zen/go/v1` with an empty string. Next turn failed differently — `requires an explicit base URL before using an OpenAI-compatible API`. Fix is the `baseUrl` line in the block above: set it explicitly, don't leave it empty. `config unset` can't remove it (runtime default, not authored).
 
 Applied via validated patch, no gateway restart:
 
