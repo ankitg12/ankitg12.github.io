@@ -6,13 +6,13 @@ categories: ai agents macos
 series: "AI coding agent productivity"
 ---
 
-macOS `say -v Samantha` is fine for one-liners. Play a full paragraph and the flat stress pattern gives it away in seconds — every word gets the same weight, like a metronome reading the news. I wanted narration I could actually listen to, running fully local on the Mac, and I walked in assuming it would cost me an afternoon of Homebrew, venvs, and model wrangling.
+macOS [`say -v Samantha`](https://developer.apple.com/library/archive/documentation/LanguagesUtilities/Conceptual/MacAutomationScriptingGuide/SpeakText.html) is fine for one-liners. Play a full paragraph and the flat stress pattern gives it away in seconds — every word gets the same weight, like a metronome reading the news. I wanted narration I could actually listen to, running fully local on the Mac, and I walked in assuming it would cost me an afternoon of Homebrew, venvs, and model wrangling.
 
 The answer was [Kokoro-82M](https://github.com/hexgrad/kokoro) — and it was already sitting inside my agent harness, one command away, [int8-quantized](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX) at ~92 MB.
 
 ---
 
-## Why Apple `say` sounds mechanical
+## Why Apple [`say`](https://developer.apple.com/library/archive/documentation/LanguagesUtilities/Conceptual/MacAutomationScriptingGuide/SpeakText.html) sounds mechanical
 
 Apple's built-in voices are a concatenative/formant-era pipeline: small recorded fragments stitched together with rule-based prosody. For short alerts it's fine. But the stitching shows on anything longer than a sentence — uniform syllable stress, no phrase-level pacing, 22 kHz ceiling. [Lukas Rieder's writeup](https://www.lukasrieder.com/blog/i-replaced-macos-say-with-local-neural-speech/) on replacing `say` with local neural speech makes the same point: a modern 82M-param neural model does in realtime on CPU what used to need a server farm, and the difference is phrase-level rhythm, not just timbre.
 
