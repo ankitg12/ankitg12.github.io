@@ -2,7 +2,6 @@
 layout: post
 title: "My terminal was burning 200% CPU. The fix was 16 lines of JSON."
 date: 2026-11-03 10:00:00 +0530
-categories: ai agents productivity
 series: "AI coding agent productivity"
 ---
 
