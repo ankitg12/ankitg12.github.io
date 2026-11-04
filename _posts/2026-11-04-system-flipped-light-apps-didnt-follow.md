@@ -12,7 +12,7 @@ macOS Auto appearance flipped to light at sunrise. [Ghostty](https://ghostty.org
 
 Auto flips `AppleInterfaceStyleSwitchesAutomatically` and removes the `AppleInterfaceStyle` key (absent = light). Nothing else. No app re-reads that key on your behalf — each one needs its own write: Ghostty's `theme =` line, VS Code's `workbench.colorTheme`, OMP's both-slots marker + config, [Tern](https://docs.stencil.so/tern/)'s `theme_light`/`theme_dark` pins.
 
-[Auto Dark Mode](https://autodarkmode.app/) solves exactly this layering on Windows — scheduled switch plus custom scripts into `tlight`/`tdark`. It is Windows-only by design ("macOS already has this"); on macOS the scheduler is built in, but the app-follow-through was missing.
+[Auto Dark Mode](https://autodarkmode.app/) solves exactly this layering on Windows — scheduled switch plus custom scripts into `tlight`/`tdark`. It is Windows-only by design ("macOS already has this"); on macOS the [Auto appearance scheduler is built in](https://support.apple.com/guide/macbook-neo/personalize-the-look-of-your-mac-apd2add7474b/mac), but the app-follow-through was missing.
 
 ## The follower: one path, all platforms
 
@@ -52,6 +52,7 @@ macOS posts `AppleInterfaceThemeChangedNotification` on `DistributedNotification
 ## Source
 
 - [Auto Dark Mode](https://autodarkmode.app/) — Windows-only by design; custom scripts hook
+- [Apple Support: personalize the look of your Mac](https://support.apple.com/guide/macbook-neo/personalize-the-look-of-your-mac-apd2add7474b/mac) — the built-in Auto appearance scheduler
 - [bouk/dark-mode-notify](https://github.com/bouk/dark-mode-notify) — `AppleInterfaceThemeChangedNotification` listener pattern
 - [Dynamic Dark Mode](https://github.com/ApolloZhu/Dynamic-Dark-Mode) — open-source macOS solar scheduler
 - [NightOwl](https://nightowlapp.co/) — menu-bar scheduler with per-app exclusions
