@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "The System Flipped to Light. The Apps Didn't Follow."
-date: 2026-11-04 08:53:00 +0530
+date: 2026-11-04 08:40:00 +0530
 categories: terminal productivity macos
 series: "Agent Mishaps"
 ---
