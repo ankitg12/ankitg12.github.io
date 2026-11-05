@@ -55,7 +55,7 @@ Three deletions in `agent-retro.ts`:
 const goalFile = sessionFile?.replace(/\.jsonl$/, ".goal.md");
 const goalContent = goalFile && existsSync(goalFile) ? ... : "NOT SET...";
 
-// removed: goal injection into retro message  
+// removed: goal injection into retro message
 const sessionCtx = idTag +
   `<!-- session-goal-content:\n${goalContent}\n-->\n` +
   (goalFile ? `<!-- session-goal-path: ${goalFile} -->\n` : "");

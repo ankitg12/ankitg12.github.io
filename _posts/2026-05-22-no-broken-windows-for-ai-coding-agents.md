@@ -113,5 +113,5 @@ NBW is one line of policy: failures are not to be tolerated, they are to be repa
 
 ---
 
-**Source:** [ankitg12/omp-nbw](https://github.com/ankitg12/omp-nbw)  
+**Source:** [ankitg12/omp-nbw](https://github.com/ankitg12/omp-nbw)
 **Requires:** [pi-boomerang](https://github.com/nicobailon/pi-boomerang), OMP (Oh My Pi)

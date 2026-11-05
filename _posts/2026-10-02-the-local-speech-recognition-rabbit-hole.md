@@ -18,7 +18,7 @@ Here is the full story, the benchmarks, and the architectural lessons learned fr
 
 ## Act I: The Handy Honeymoon (and the Wayland Reality Check)
 
-When setting up voice input on my new Linux workstation, my initial choice was straightforward: install [Handy](https://github.com/cjpais/Handy). 
+When setting up voice input on my new Linux workstation, my initial choice was straightforward: install [Handy](https://github.com/cjpais/Handy).
 
 I had previously installed and tested Handy on Windows, where its clean Tauri GUI and local model management worked reliably. When I moved to Linux, reaching for Handy felt like natural continuity—it offers a pre-packaged AppImage, bundled local models, and cross-platform familiarity.
 
@@ -30,7 +30,7 @@ On paper, Handy's architecture is brilliant:
 I installed Handy v0.9.7, wired it to a global GNOME shortcut (`Ctrl+Super+H`), and gave it a spin. Within twenty minutes, the Linux desktop reality check arrived.
 
 ### 1. The SoundWire VAD Failure
-On my laptop, the internal microphone array operates over the Intel/AMD SoundWire digital audio bus. When dictating short phrases through Handy, the transcripts consistently came back completely empty. 
+On my laptop, the internal microphone array operates over the Intel/AMD SoundWire digital audio bus. When dictating short phrases through Handy, the transcripts consistently came back completely empty.
 
 Digging into the logs, Handy's bundled Silero Voice Activity Detector (VAD) was aggressively misclassifying short SoundWire audio frames as silence and dropping them before they ever reached the transcription model. Disabling VAD helped, but replaying the captured WAV buffers through PipeWire revealed timing glitches where Handy's audio pipeline clipped buffer boundaries (which I filed upstream as Handy issue [#2187](https://github.com/cjpais/Handy/issues/2187)).
 
@@ -79,9 +79,9 @@ In Handy, dictation had felt noticeably sharper. That sparked the rabbit hole: *
 
 ## Act III: Whisper vs. Parakeet (and the UMA GPU Surprise)
 
-My workstation is powered by an AMD Ryzen AI 7 PRO 350 processor featuring Zen 5 CPU cores and an integrated AMD Radeon 860M GPU (`GFX1152`). 
+My workstation is powered by an AMD Ryzen AI 7 PRO 350 processor featuring Zen 5 CPU cores and an integrated AMD Radeon 860M GPU (`GFX1152`).
 
-The standard mental model in AI is simple: *"GPUs are always faster than CPUs."* 
+The standard mental model in AI is simple: *"GPUs are always faster than CPUs."*
 
 To verify this, I downloaded both engines and benchmarked them against the exact same real-world voice recording (`11.91 seconds` of 16 kHz mono speech):
 
@@ -109,7 +109,7 @@ The explanation lies in hardware microarchitecture and memory topology:
 
 ## Act IV: The Quantization Trap (793 MB vs. 1.5 GB vs. 2.4 GB)
 
-While Parakeet was blazingly fast, it had a glaring flaw in Voxtype 1.1.0: it lacked **vocabulary steering**. When I dictated *"whisper or parakeet"*, Parakeet transcribed it phonetically as *"this or current eight"*. 
+While Parakeet was blazingly fast, it had a glaring flaw in Voxtype 1.1.0: it lacked **vocabulary steering**. When I dictated *"whisper or parakeet"*, Parakeet transcribed it phonetically as *"this or current eight"*.
 
 Whisper, by contrast, supports an `initial_prompt` parameter. By seeding the prompt with domain keywords:
 ```toml
@@ -135,7 +135,7 @@ Whisper Medium contains **769 million parameters** across 24 encoder layers and 
 - **8-Bit Quantization (`Q8_0`, Handy's Default):** Handy downloads pre-quantized GGUF models (`whisper-medium-Q8_0.gguf`). Quantizing weights to 8-bit signed integers (1 byte per parameter) cuts the footprint in half:
   $$769 \times 10^6 \times 1\text{ byte} \approx 769\text{ MB (785 MiB / 793 MB on disk)}$$
 
-`Q8_0` preserves over 99.8% of the FP16 word accuracy while cutting memory bandwidth demands across the shared LPDDR5 bus by 50%. 
+`Q8_0` preserves over 99.8% of the FP16 word accuracy while cutting memory bandwidth demands across the shared LPDDR5 bus by 50%.
 
 Voxtype's automated setup script had simply defaulted to the unquantized FP16 upstream binary. The fix was downloading the official `ggml-medium.en-q8_0.bin` (786 MB) directly from Hugging Face and symlinking it into place. GPU resident memory dropped from 1.53 GB to 822 MB, and latency improved from 1.66s to 1.43s.
 
@@ -164,7 +164,7 @@ At my cursor, text appeared in violent fits and starts:
 Okay, let's see if we... see the result. stream. here. now. Seems like really bad quality.
 ```
 
-Words were dropped, random periods were inserted between syllables, and latency lagged several seconds behind my voice. 
+Words were dropped, random periods were inserted between syllables, and latency lagged several seconds behind my voice.
 
 I checked `journalctl --user -u voxtype`:
 ```text
@@ -245,7 +245,7 @@ This exposed the final architectural split between the tools:
 - **Handy's Clean GGUF Stack:** Built on `parakeet.cpp` and `transcribe.cpp`. Every model in Handy's catalog is pre-quantized to 8-bit integers (`Q8_0`).
 - **Voxtype's Clunky ONNX Stack:** Voxtype 1.1.0 uses Microsoft's ONNX Runtime (`onnxruntime`). While it had an int8 quantized build for `parakeet-tdt-0.6b-v3-int8`, whoever packaged `parakeet-unified` dumped the raw float32 ONNX graph straight out of NVIDIA NeMo without quantizing it.
 
-I killed the download immediately. 
+I killed the download immediately.
 
 And the punchline? Voxtype's own author recognized this exact mess. In Voxtype's developer roadmap (`CLAUDE.md`, lines 360–371):
 
@@ -264,7 +264,7 @@ After a full day of profiling, the final daily-driver configuration on my Linux 
 2. **Hotkey:** Physical `Numpad 0/Ins` (`KEY_KP0`, scancode 82) bound directly via Linux `evdev`. Zero desktop shortcut conflicts.
 3. **Typing Engine:** Native `ydotool` via `/dev/uinput`. Fast, reliable, and never touches the system clipboard.
 4. **Model:** **Whisper Medium Q8_0 (786 MB)** running on the **AMD Radeon 860M GPU via Vulkan** (`ggml-vulkan`).
-5. **Mode:** **Batch-on-stop** (toggle on, speak, toggle off). 
+5. **Mode:** **Batch-on-stop** (toggle on, speak, toggle off).
    - Decodes a 7-second utterance in **1.19 seconds**.
    - Conditioned with `initial_prompt` to capture technical engineering jargon, acronyms, and proper nouns.
    - Zero hallucination loops, zero dropped frames, and zero buffer starvation.

@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: detect-private-key
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.28.0
+    hooks:
+      - id: gitleaks
+  - repo: local
+    hooks:
+      - id: no-app-passwords
+        name: no app passwords or emails in posts
+        entry: bash -c 'git diff --cached --name-only -z | xargs -0 grep -nE "[a-z]{4} [a-z]{4} [a-z]{4} [a-z]{4}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}" -- _posts/ 2>/dev/null && { echo "BLOCKED: possible secret or email in _posts/"; exit 1; } || exit 0'
+        language: system
+        stages: [commit]

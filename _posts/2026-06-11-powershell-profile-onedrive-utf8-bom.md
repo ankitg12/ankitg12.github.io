@@ -77,7 +77,7 @@ Rule: always confirm with `$PROFILE` before touching any profile file. Once per 
 
 The OneDrive profile (`WindowsPowerShell\Microsoft.PowerShell_profile.ps1`) had its own standalone `tlight`/`tdark` — no dot-sourcing of a shared file, just inline definitions. The `tdark` in `C:\Users\<you>\Documents\PowerShell\...` (the PS7 profile) was irrelevant because Windows PowerShell 5 never loads PS7's profile directory.
 
-PS5 (`powershell.exe`) → `WindowsPowerShell\Microsoft.PowerShell_profile.ps1`  
+PS5 (`powershell.exe`) → `WindowsPowerShell\Microsoft.PowerShell_profile.ps1`
 PS7 (`pwsh.exe`) → `PowerShell\Microsoft.PowerShell_profile.ps1`
 
 Two separate profile directories. Two separate sets of function definitions. The PS7 edit did nothing for a PS5 shell.

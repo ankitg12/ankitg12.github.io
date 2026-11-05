@@ -70,7 +70,7 @@ const result = spawnSync(PYTHON, [
 ], { timeout: 10_000, windowsHide: true });
 ```
 
-Result in RPC test session: **✅ 0.65s, success.**  
+Result in RPC test session: **✅ 0.65s, success.**
 Result in interactive TUI session: **❌ ETIMEDOUT, status=null, 78ms.**
 
 ---

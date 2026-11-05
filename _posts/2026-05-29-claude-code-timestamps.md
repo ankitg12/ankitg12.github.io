@@ -119,7 +119,7 @@ def fmt_secs(secs: float) -> str:
 [09:22:01 AM] — session ending (logout) — Claude 4m12s | wall 47m33s
 ```
 
-**Claude time**: sum of all turn durations. How long the model was actually computing.  
+**Claude time**: sum of all turn durations. How long the model was actually computing.
 **Wall time**: session open to session close. How long you had CC open.
 
 The gap is your think/type/read time. A 47-minute session where Claude computed for 4 minutes means 43 minutes of human time — reviewing output, deciding next steps, getting coffee. That ratio matters for understanding where sessions actually go.

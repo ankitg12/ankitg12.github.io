@@ -16,7 +16,7 @@ Here is the story of how we broke our agent, the debugging rabbit hole that foll
 
 In multi-model agent frameworks like Oh-My-Pi (OMP), moving a conversation between models requires "flattening" the previous model's tool calls. If Claude made a tool call using its specific native signature, Gemini's API will reject that foreign signature as invalid when it inherits the context.
 
-To fix this, we wrote an extension to intercept the outgoing payload right before the network request (`before_provider_request`). We converted the old foreign tool calls into flat text strings, preserving the context without crashing the gateway. 
+To fix this, we wrote an extension to intercept the outgoing payload right before the network request (`before_provider_request`). We converted the old foreign tool calls into flat text strings, preserving the context without crashing the gateway.
 
 Our flattening logic looked like this:
 
@@ -29,7 +29,7 @@ This successfully bypassed the API validation errors. But it created a semantic 
 
 ### The Trap: Imitating the Assistant's Voice
 
-From the new model's perspective, it opened its eyes, looked at the `role: "assistant"` messages in its context window, and saw that its "past self" executed tools by just writing `[called bash(...)]` in plain text. 
+From the new model's perspective, it opened its eyes, looked at the `role: "assistant"` messages in its context window, and saw that its "past self" executed tools by just writing `[called bash(...)]` in plain text.
 
 LLMs are fundamentally few-shot learners that heavily weight their own conversational history. The model saw a pattern, assumed it was the required output format, and obediently imitated it. Native tool calling silently degraded into prose.
 
@@ -37,15 +37,15 @@ We didn't realize this immediately. At first, we assumed the OMP platform or the
 
 ### The Upstream Assist: Wire Format vs. Native Provenance
 
-The OMP maintainer, `roboomp`, quickly set us straight. 
+The OMP maintainer, `roboomp`, quickly set us straight.
 
 They clarified that OMP's internal stripping works correctly, but we were using an OpenAI-compatible gateway route. Our extension *was* necessary for our specific routing, but our implementation was flawed.
 
-More importantly, `roboomp` gave us a massive architectural hint. We were hooking into the serialization layer (`before_provider_request`), trying to guess which turns were foreign by checking if their tool calls lacked a specific `||thought_signature||` marker. 
+More importantly, `roboomp` gave us a massive architectural hint. We were hooking into the serialization layer (`before_provider_request`), trying to guess which turns were foreign by checking if their tool calls lacked a specific `||thought_signature||` marker.
 
 Heuristics based on the *absence* of a marker are brittle. If the gateway ever changed its ID formats, native calls would be mistakenly flattened.
 
-Instead, `roboomp` suggested we move our intercept hook earlier in the framework lifecycle: the `context` event. At this stage, we have access to native `AgentMessage` objects that carry explicit `model`, `provider`, and `api` fields. 
+Instead, `roboomp` suggested we move our intercept hook earlier in the framework lifecycle: the `context` event. At this stage, we have access to native `AgentMessage` objects that carry explicit `model`, `provider`, and `api` fields.
 
 | Approach | Where it hooks | How it detects foreign turns | Failure Mode |
 |---|---|---|---|
