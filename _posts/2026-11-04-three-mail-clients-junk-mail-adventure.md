@@ -119,4 +119,3 @@ The junk mail itself: still in the inbox. The dry run (`trash --query`, no `--ap
 - [aerc](https://aerc-mail.org/)
 - [ortie](https://github.com/pimalaya/ortie)
 - [Microsoft Graph](https://learn.microsoft.com/en-us/graph/) (TTL-cache pattern reference)
- 

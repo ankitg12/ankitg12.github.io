@@ -15,6 +15,10 @@ repos:
     hooks:
       - id: no-app-passwords
         name: no app passwords or emails in posts
-        entry: bash -c 'git diff --cached --name-only -z | xargs -0 grep -nE "[a-z]{4} [a-z]{4} [a-z]{4} [a-z]{4}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}" -- _posts/ 2>/dev/null && { echo "BLOCKED: possible secret or email in _posts/"; exit 1; } || exit 0'
+        entry: >-
+          bash -c 'git diff --cached --name-only -z | xargs -0 grep -nE
+          "[a-z]{4} [a-z]{4} [a-z]{4} [a-z]{4}|[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}"
+          -- _posts/ 2>/dev/null && { echo "BLOCKED: possible secret or email
+          in _posts/"; exit 1; } || exit 0'
         language: system
         stages: [commit]
