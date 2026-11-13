@@ -211,6 +211,33 @@ The keyring is encrypted with the login password. A fingerprint login does not g
 - Why the WirePlumber priority rule did not keep the speaker as the default. My guess is that a default saved in `default-nodes` takes precedence over `priority.session`; I have not tested it.
 - Whether the audio call on 2 November used the laptop speakers or a headset.
 
+## Update, 13 November: when the speaker output is missing
+
+The dictation start beep went silent again, but this time the failure was different. `wpctl status` showed only `Dummy Output`, and the internal sound card's active profile was `off`. Its available profiles were `off` and `pro-audio`; `HiFi`, which provides the speaker output on this machine, was absent. Dictation still worked, but its beep stream was routed to the dummy output.
+
+The sound-card configuration was readable when tested directly:
+
+```text
+$ alsaucm -c hw:2 list _verbs
+  0: HiFi
+    Play HiFi quality Music
+```
+
+Restarting the user audio services restored the `HiFi` profile and the speaker sink. After the restart, `speaker-check` measured a 1 kHz tone-to-baseline ratio of 2111.6 and returned `PASS`. [Voxtype](https://github.com/peteonrails/voxtype)'s stream was no longer present after the audio restart; restarting Voxtype connected its output to the speaker. The dictation beep then worked by ear.
+
+```sh
+systemctl --user restart pipewire pipewire-pulse wireplumber
+systemctl --user restart voxtype
+```
+
+This is a recovery for the observed state, not a reason to restart audio services for every silent application. A restart can interrupt active audio streams.
+
+### A startup hypothesis, not a confirmed cause
+
+The sound card's headset-jack registration appeared 2.3 seconds before PipeWire started on this boot. The corresponding gaps on three earlier boots were approximately 9.5–14 seconds. That timing suggests a startup race, but it does not establish when the card became ready, whether the earlier boots had working speaker outputs, or why WirePlumber did not offer `HiFi` this time.
+
+I added a user-service drop-in that waits up to 30 seconds for `alsaucm -c hw:amdsoundwire list _verbs` to succeed before WirePlumber starts. The check succeeded against the already-running card, and systemd loaded the drop-in. It has **not** been tested on a fresh boot or against the original failure. A successful later boot would show the profile was available then; it would not by itself prove the race or that this wait prevented it.
+
 ## Source
 
 - [thesofproject/linux#5845 — Internal speakers silent on Dell 16 Plus despite fully working driver/mixer chain](https://github.com/thesofproject/linux/issues/5845)
