@@ -25,19 +25,19 @@ The number is the file size observed at one point, not the duration or a diagnos
 
 The agent tried the recorder's [D-Bus](https://www.freedesktop.org/wiki/Software/dbus/) stop method. It returned `false`. The installed recorder source explains that result: `StopScreencast` looks up a recorder by the calling D-Bus sender, and returns `false` if that sender has no recorder. A separate command was not the client that started this recording.
 
-## The shortcut cleared the overlay
+## The shortcut did not resolve it
 
 Other people have reported [GNOME recordings that do not stop](https://discussion.fedoraproject.org/t/cant-stop-gnome-shell-screencast-on-fedora38/84397/2). Ubuntu's [screen recording guide](https://ubuntu.com/desktop/docs/en/latest/how-to/record-the-screen/) says to stop a recording using its red panel indicator; the discussion also mentions `Ctrl+Alt+Shift+R`.
 
-The agent sent that shortcut. A new screenshot showed that the dim overlay and bright rectangle had disappeared. But the same recording file remained open and continued to grow. The visible overlay was gone; the recording was not stopped.
+The agent sent that shortcut. A screenshot in a dark terminal theme appeared to show the overlay had disappeared, but changing back to a light theme made it visible again. The same recording file remained open and continued to grow. Neither the overlay nor the recording was resolved.
 
 ## What this did not establish
 
 - Whether the recording caused the overlay, or whether both came from the same interaction.
-- Why the shortcut cleared the overlay but did not stop the recording.
+- Why the overlay was difficult to see in the dark theme, or how to dismiss it.
 - How to stop this recording cleanly from a different D-Bus client.
 
-The useful distinction was between the screen looking normal and the underlying recording actually ending. They were not the same result.
+A dark theme made the screen look normal in the screenshot. Changing the theme showed that the overlay was still there. The recording was still active too.
 
 ## Source
 
