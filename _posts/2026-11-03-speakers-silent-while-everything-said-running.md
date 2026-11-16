@@ -236,7 +236,17 @@ This is a recovery for the observed state, not a reason to restart audio service
 
 The sound card's headset-jack registration appeared 2.3 seconds before PipeWire started on this boot. The corresponding gaps on three earlier boots were approximately 9.5–14 seconds. That timing suggests a startup race, but it does not establish when the card became ready, whether the earlier boots had working speaker outputs, or why WirePlumber did not offer `HiFi` this time.
 
-I added a user-service drop-in that waits up to 30 seconds for `alsaucm -c hw:amdsoundwire list _verbs` to succeed before WirePlumber starts. The check succeeded against the already-running card, and systemd loaded the drop-in. It has **not** been tested on a fresh boot or against the original failure. A successful later boot would show the profile was available then; it would not by itself prove the race or that this wait prevented it.
+A user-service drop-in waited up to 30 seconds for `alsaucm -c hw:amdsoundwire list _verbs` to succeed before WirePlumber started. On 14 November the check succeeded, but `HiFi` was still absent. The check therefore did not prevent this failure. A bounded login-time recovery now checks the actual profile and can restart WirePlumber once if it is missing. That is a recovery measure, not proof of the startup race.
+
+## A third failure: microphone missing in a call after audio recovery
+
+On 16 November, the microphone worked for dictation but failed in a call. This was not the silent-speaker fault, and it was not the missing `HiFi` profile. On 14 November, I had restarted PipeWire and its PulseAudio-compatible service to recover the missing speaker output. The calling application's Chromium audio utility process had started before that restart and was still running two days later. The audio services did not restart after every laptop sleep: the logs showed they remained up through the later sleep cycles.
+
+[Inference] The application's existing audio utility had retained a stale connection across the audio-server restart. Terminating that utility—not the whole application—caused it to start a new one on the next microphone use. A subsequent call worked. That supports the recovery, but it does not by itself prove the internal connection state.
+
+Other users have reported the same pattern after PulseAudio or PipeWire restarts: playback continues but microphone capture fails until the browser or its audio utility is restarted. The [Brave report](https://github.com/brave/brave-browser/issues/13030) includes reports for Chrome, Chromium and PipeWire; a [Chromium issue](https://issuetracker.google.com/issues/422706687) describes the same failure.
+
+I added a systemd user service that runs after `pipewire-pulse` starts. It selects only same-user Chromium-based application and browser audio utility processes that started before the current audio server, then sends those processes `SIGTERM`. The application starts a replacement when it needs audio. This can interrupt an active call, so it is a recovery for an audio-server restart, not a fix for the SoundWire startup fault. Unit tests and an isolated process test passed, and the enabled service ran successfully against the healthy session without resetting its newer calling-application audio process.
 
 ## Source
 
