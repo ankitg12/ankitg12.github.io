@@ -29,15 +29,21 @@ The agent tried the recorder's [D-Bus](https://www.freedesktop.org/wiki/Software
 
 Other people have reported [GNOME recordings that do not stop](https://discussion.fedoraproject.org/t/cant-stop-gnome-shell-screencast-on-fedora38/84397/2). Ubuntu's [screen recording guide](https://ubuntu.com/desktop/docs/en/latest/how-to/record-the-screen/) says to stop a recording using its red panel indicator; the discussion also mentions `Ctrl+Alt+Shift+R`.
 
-The agent sent that shortcut. A screenshot in a dark terminal theme appeared to show the overlay had disappeared, but changing back to a light theme made it visible again. The same recording file remained open and continued to grow. Neither the overlay nor the recording was resolved.
+The agent sent that shortcut. A screenshot in a dark terminal theme appeared to show the overlay had disappeared, but changing back to a light theme made it visible again. The recording file stayed open and kept growing.
+
+## What stopped it
+
+I chose to end the recorder process. The agent sent `SIGTERM` to the `gjs` recorder process. It exited, and the file stopped growing at about 27 MB. A new screenshot of the affected monitor showed no dim layer and no bright rectangle.
+
+`ffprobe` reported `duration=N/A` for the file, so the recording is probably cut off. I have not played it.
 
 ## What this did not establish
 
-- Whether the recording caused the overlay, or whether both came from the same interaction.
-- Why the overlay was difficult to see in the dark theme, or how to dismiss it.
-- How to stop this recording cleanly from a different D-Bus client.
+- Whether the recording caused the overlay. The overlay vanished when the recorder stopped, which fits that idea but does not prove it.
+- Why Escape and the shortcut had no effect.
+- Whether the recording can be saved by a clean stop. That would need the D-Bus client that started it.
 
-A dark theme made the screen look normal in the screenshot. Changing the theme showed that the overlay was still there. The recording was still active too.
+The dark theme also hid the overlay from the agent's screenshots. A "gone" verdict from a screenshot is only as good as the theme it was taken in.
 
 ## Source
 
