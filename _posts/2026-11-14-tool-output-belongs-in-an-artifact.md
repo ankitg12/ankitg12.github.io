@@ -126,7 +126,7 @@ The extension adds range-reading guidance to the system prompt before each user 
 
 A separate code-outline mode was removed in favour of the read tool's existing structural summary. That does not make stride a code-aware outline: sampling a long structural summary can still remove declarations, so an exact range read remains important.
 
-A further check found that sampled raw ranges used offsets within the returned range as if they were source line numbers. The extension now uses the requested source start for explicit raw ranges; tests cover both selector orders and source text that itself begins with a number and a pipe. The terminal gutter still counts displayed rows consecutively for sampled code, so it can disagree with the inline source numbers. The minimum-budget edge case noted above was not revalidated in this update.
+A further check found that sampled raw ranges used offsets within the returned range as if they were source line numbers. The extension now uses the requested source start for explicit raw ranges; tests cover both selector orders and source text that itself begins with a number and a pipe. The terminal preview now uses a consistent one-based gutter for display rows, separate from the source numbers in the text. That display change still needs a live check after reload. The minimum-budget edge case noted above was not revalidated in this update.
 
 ## Source
 
