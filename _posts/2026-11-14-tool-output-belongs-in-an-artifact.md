@@ -114,6 +114,18 @@ The alternatives are not interchangeable. For code, a syntax-aware outline can g
 
 The result is a smaller default surface that preserves the tool result. The design depends on the full result remaining available and on the terminal and model views agreeing about what was shortened.
 
+## Update: making the preview easier to use
+
+A later terminal check showed that the model and the human could see different formatting for the same sampled Markdown. The model received numbered lines; the terminal rendered the text as Markdown and joined some lines together. The read preview now uses plain text, so the line numbers and breaks can be checked in the terminal too.
+
+A short range read also exposed a limit interaction. The read tool can add context around a requested range, making its result longer than the requested range. The extension now leaves an explicit range within the configured read limit intact. Larger reads remain subject to the limit.
+
+The read tool can shorten a result before the extension receives it. That produced two notices and two artifacts: one held the full output, while the other held the already-shortened result. When the tool's metadata confirms the full artifact, the extension now shows one combined notice and points to that artifact. A restarted-session check retrieved lines from the section that the tool had omitted. For a byte-limited read without a full artifact, the combined notice instead identifies the saved partial result and tells the agent where to continue in the source.
+
+The extension adds range-reading guidance to the system prompt before each user prompt. When stride is enabled, the guidance also explains that a sample is not contiguous and distinguishes source line numbers from positions in a saved result. This is separate from the short notice on each shortened result.
+
+A separate code-outline mode was removed in favour of the read tool's existing structural summary. That does not make stride a code-aware outline: sampling a long structural summary can still remove declarations, so an exact range read remains important. The raw-range numbering and minimum-budget edge cases noted above were not revalidated in this update.
+
 ## Source
 
 - [oh-my-pi](https://github.com/can1357/oh-my-pi)
