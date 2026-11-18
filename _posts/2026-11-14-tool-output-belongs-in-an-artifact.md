@@ -57,6 +57,51 @@ The extension reads its configuration from `$XDG_CONFIG_HOME/omp/tool-output-lin
 
 The configuration is read for each tool result, so changes take effect on the next result. Other extensions still use their existing configuration paths; migrating those consistently is a separate task.
 
+## Zoom out, then zoom in
+
+A head-only preview makes the beginning easy to inspect and the rest invisible. I added an experimental `stride` mode that selects sample points across the result. Each point can include surrounding lines, like [grep's `-B` and `-A` context options](https://man7.org/linux/man-pages/man1/grep.1.html). Context is intended to fit the same line budget: more context means fewer sample points; if two points with their context cannot fit, the implementation drops the context. The minimum-budget edge case below needs a fix.
+
+The last output line is still a notice. It says the result is sampled and non-contiguous and links to the saved result. A sample is an overview, not proof that omitted lines are unimportant. It is also possible to miss a rare event in a repetitive log.
+
+These additions are in local commits; they are **not yet in the published extension**. The intended configuration sets the mode globally or for a named tool:
+
+```json
+{
+  "maxLines": 30,
+  "maxPreviewChars": 4000,
+  "tools": {
+    "read": { "mode": "stride", "before": 1, "after": 1 }
+  }
+}
+```
+
+The local version also has a session-only `/tool-lines` command. `/tool-lines stride context=1 30` selects stride mode, one line of context on each side, and a 30-line budget. `/tool-lines head` selects a head preview; `/tool-lines off` disables the extension's truncation for that session; `/tool-lines on` resets the override to the config. The command does not edit the config file.
+
+### Line numbers are part of the contract
+
+A read result can already be a selected range or a structural summary. Its saved artifact contains that **result**, not necessarily the original file. Artifact line numbers count positions in the saved result; source line numbers refer to the file. The updated notice distinguishes these coordinates. For a source file, use the source path and a source range; for a command result, use a range of the saved artifact.
+
+A fresh-session test found a remaining defect: when a raw ranged read began at source line 35, stride labelled the first sampled line `1`. Until that is fixed, the displayed numbers from sampled raw ranged reads are not reliable source coordinates. This is a reason to verify a source range against the original file before acting on it. Code inspection also shows that at the minimum `maxLines: 2`, stride keeps two sample lines plus the notice, exceeding the intended two-line budget. Both defects remain open in the local version.
+
+A second mismatch appeared in skill reads. The read tool adds a provenance line before its numbered text. The extension originally checked only the first line for a number, so it saved the remaining prefixes; reopening that artifact added another set of numbers. A local fix handles the provenance wrapper and preserves raw content that genuinely starts with `1|`. Existing artifacts retain the bytes they were saved with.
+
+### Existing tools and prior art
+
+| Tool | What it contributes | Fit for this extension |
+|---|---|---|
+| [sed](https://man7.org/linux/man-pages/man1/sed.1.html) and [awk](https://man7.org/linux/man-pages/man1/awk.1p.html) | Select lines at regular intervals. | Useful in a shell pipeline; the OMP hook still needs to transform arbitrary tool results. |
+| [grep](https://man7.org/linux/man-pages/man1/grep.1.html) | Keeps lines around a match with `-B` and `-A`. | A useful model for context, but it selects around matches, not evenly spaced points. |
+| [VenetianBlinds.js](https://github.com/firasd/vblinds) | Samples evenly spaced character positions and shows context. | Closest prior art. Its character windows can cut through lines, so it does not directly meet a whole-line output budget. |
+| [Aider's repository map](https://aider.chat/docs/repomap.html) | Selects code symbols within a token budget. | A code-aware overview, rather than a sample of arbitrary text. |
+| [ast-grep outline](https://ast-grep.github.io/guide/outline-code) and [Tree-sitter code navigation](https://tree-sitter.github.io/tree-sitter/4-code-navigation.html) | Find code structure and source positions. | Useful for choosing a function to inspect; they do not replace sampling logs or other text. |
+| OMP's native read summary | Shows code declarations and ranges before a detailed read. | An existing code-aware zoom-out; applying stride afterward can remove declarations from that summary. |
+
+A local test with ast-grep 0.51.3 returned a function's source range, which could then be read directly. OMP's embedded ast-grep was 0.50.0 and did not support `outline`; in this installation, setting `PI_DISABLE_UUTILS_BUILTINS=1` let a fresh OMP session use the locally installed executable. That switch affects the embedded utility replacements as a group, not only ast-grep. I used `outline` independently to inspect the extension's exported symbols; the output-limiting extension does not call it or depend on it. An agent can use `ast-grep outline path/to/file.ts --items exports` to select a symbol, then `read` the relevant source range. OMP's own code summary is another option for the same initial zoom-out.
+
+**Why implement stride here?** The integration point is an OMP `tool_result` hook, where the result is already in memory and may come from many tools. The intended contract is a fixed line budget, whole lines, optional before/after context, a saved result, and matching model and terminal previews. `sed` and `awk` can select lines, and `grep` can add context, but using them here still leaves the hook, budget allocation, artifact handling, and display metadata to the extension. Calling a separate process for every tool result would add another moving part. VenetianBlinds provides a close sampling approach, but its context is measured in characters; its documented interface does not provide the same whole-line budget. The code-aware options solve a different problem.
+
+The alternatives are not interchangeable. For code, a syntax-aware outline can give a more meaningful overview than every Nth line. For arbitrary tool output, a bounded sample and an artifact remain useful. No task-level comparison has yet established which approach makes an agent more effective, and the raw-range defect shows that the custom integration still has correctness work to do.
+
 ## What the exercise changed
 
 | Question | Decision |
